@@ -7,7 +7,7 @@ interface NetworkBadgeProps {
 }
 
 export function NetworkBadge({ network }: NetworkBadgeProps) {
-  const supported = network === 'mainnet' || network === 'nile';
+  const supported = network === 'nile';
   const unknown = network === 'unknown';
   const Icon = supported ? CheckCircle2 : unknown ? CircleHelp : AlertTriangle;
 

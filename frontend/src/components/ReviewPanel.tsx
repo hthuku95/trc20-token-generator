@@ -11,7 +11,7 @@ interface ReviewPanelProps {
 }
 
 export function ReviewPanel({ token, network, factoryAddress, disabled, onDeploy }: ReviewPanelProps) {
-  const ready = Boolean(token && factoryAddress && (network === 'mainnet' || network === 'nile'));
+  const ready = Boolean(token && factoryAddress && network === 'nile');
 
   return (
     <aside className="rounded-lg border border-line bg-panel/86 p-5 shadow-glow">

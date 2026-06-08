@@ -34,17 +34,23 @@ export async function connectTronLink() {
   }
 
   if (window.tronLink.request) {
-    const response = await window.tronLink.request({ method: 'tron_requestAccounts' });
+    try {
+      const response = await window.tronLink.request({ method: 'tron_requestAccounts' });
 
-    if (response.code !== 200) {
-      throw new Error(response.message ?? 'Wallet connection rejected.');
+      if (response && typeof response === 'object' && response.code !== 200) {
+        throw new Error(response.message ?? 'Wallet connection rejected.');
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message === 'Wallet connection rejected.') {
+        throw error;
+      }
     }
   }
 
   const snapshot = getWalletSnapshot();
 
   if (!snapshot.walletAddress) {
-    throw new Error('Connect Wallet.');
+    throw new Error('No wallet address found. Unlock TronLink and switch to Nile Testnet.');
   }
 
   return snapshot;
@@ -66,8 +72,8 @@ export async function deployToken(
     throw new Error('Connect Wallet.');
   }
 
-  if (snapshot.network !== 'mainnet' && snapshot.network !== 'nile') {
-    throw new Error('Unsupported network. Use TRON Mainnet or Nile Testnet.');
+  if (snapshot.network !== 'nile') {
+    throw new Error('Unsupported network. Switch TronLink to Nile Testnet.');
   }
 
   if (!FACTORY_ADDRESS) {
