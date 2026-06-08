@@ -56,6 +56,33 @@ export async function connectTronLink() {
   return snapshot;
 }
 
+export async function addTokenToWallet(
+  type: 'trc20',
+  address: string,
+  symbol?: string,
+  decimals?: number,
+  image?: string,
+) {
+  const tronWeb = getTronWeb();
+
+  if (!tronWeb || typeof tronWeb.request !== 'function') {
+    const tronLink = window.tronLink;
+    if (tronLink?.request) {
+      await tronLink.request({
+        method: 'wallet_watchAsset',
+        params: { type, options: { address, symbol, decimals, image } },
+      });
+      return;
+    }
+    throw new Error('TronLink not available.');
+  }
+
+  await tronWeb.request({
+    method: 'wallet_watchAsset',
+    params: { type, options: { address, symbol, decimals, image } },
+  });
+}
+
 interface DeployTokenOptions {
   onStatusChange?: (status: DeploymentStatus) => void;
   onTransactionHash?: (transactionHash: string) => void;

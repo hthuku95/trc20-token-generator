@@ -48,12 +48,16 @@ export interface TronWebLike {
   trx: {
     getTransactionInfo: (transactionHash: string) => Promise<Record<string, unknown>>;
   };
+  request: (args: {
+    method: string;
+    params: Record<string, unknown>;
+  }) => Promise<unknown>;
 }
 
 declare global {
   interface Window {
     tronLink?: {
-      request?: (args: { method: string }) => Promise<{ code: number; message?: string }>;
+      request?: (args: { method: string; params?: Record<string, unknown> }) => Promise<{ code: number; message?: string }>;
     };
     tronWeb?: TronWebLike;
   }

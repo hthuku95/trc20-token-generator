@@ -1,6 +1,7 @@
-import { Copy, ExternalLink, PlusCircle } from 'lucide-react';
+import { Copy, ExternalLink, PlusCircle, Wallet } from 'lucide-react';
 import type { ReactElement } from 'react';
 import toast from 'react-hot-toast';
+import { addTokenToWallet } from '../services/tronLink';
 import type { DeploymentResult } from '../types/tron';
 import { getTronScanAddressUrl, getTronScanTxUrl } from '../utils/network';
 
@@ -42,6 +43,18 @@ export function SuccessCard({ result, onCreateAnother }: SuccessCardProps) {
       <div className="mt-6 flex flex-wrap gap-3">
         <ActionButton onClick={() => copy(result.contractAddress, 'Address')} label="Copy Address" icon={<Copy />} />
         <ActionButton onClick={() => copy(result.transactionHash, 'Transaction hash')} label="Copy TX Hash" icon={<Copy />} />
+        <ActionButton
+          onClick={async () => {
+            try {
+              await addTokenToWallet('trc20', result.contractAddress, result.symbol, result.decimals, result.iconUrl);
+              toast.success('Token added to TronLink');
+            } catch {
+              toast.error('Could not add to TronLink. Copy the address and add it manually.');
+            }
+          }}
+          label="Add to TronLink"
+          icon={<Wallet />}
+        />
         <a
           href={getTronScanTxUrl(result.network, result.transactionHash)}
           target="_blank"
