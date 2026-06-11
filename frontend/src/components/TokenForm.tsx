@@ -14,6 +14,9 @@ const initialValues: TokenFormValues = {
   supply: '1000000',
   decimals: 6,
   iconUrl: '',
+  vanityPattern: '',
+  vanitySalt: '',
+  vanityAddress: '',
 };
 
 export function TokenForm({ disabled, onReview }: TokenFormProps) {
@@ -39,6 +42,9 @@ export function TokenForm({ disabled, onReview }: TokenFormProps) {
       supply: values.supply.trim(),
       decimals: values.decimals,
       iconUrl: values.iconUrl.trim(),
+      vanityPattern: values.vanityPattern,
+      vanitySalt: values.vanitySalt,
+      vanityAddress: values.vanityAddress,
     });
   }
 

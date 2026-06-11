@@ -14,6 +14,9 @@ export interface TokenFormValues {
   supply: string;
   decimals: number;
   iconUrl: string;
+  vanityPattern: string;
+  vanitySalt: string;
+  vanityAddress: string;
 }
 
 export interface DeploymentResult extends TokenFormValues {
@@ -27,6 +30,10 @@ export interface TronContractCall {
   send: (options?: Record<string, unknown>) => Promise<string>;
 }
 
+export interface TronViewCall<T> {
+  call: () => Promise<T>;
+}
+
 export interface TokenFactoryContract {
   createToken: (
     name: string,
@@ -35,6 +42,31 @@ export interface TokenFactoryContract {
     decimals: number,
     iconUrl: string,
   ) => TronContractCall;
+  createTokenVanity: (
+    name: string,
+    symbol: string,
+    supply: string | number,
+    decimals: number,
+    iconUrl: string,
+    salt: string,
+  ) => TronContractCall;
+  predictTokenAddress: (
+    name: string,
+    symbol: string,
+    supply: string | number,
+    decimals: number,
+    iconUrl: string,
+    owner: string,
+    salt: string,
+  ) => TronViewCall<string>;
+  getInitCodeHash: (
+    name: string,
+    symbol: string,
+    supply: string | number,
+    decimals: number,
+    iconUrl: string,
+    owner: string,
+  ) => TronViewCall<string>;
 }
 
 export interface TronWebLike {
@@ -52,6 +84,10 @@ export interface TronWebLike {
     method: string;
     params: Record<string, unknown>;
   }) => Promise<unknown>;
+  address: {
+    toHex: (address: string) => string;
+    fromHex: (address: string) => string;
+  };
 }
 
 declare global {

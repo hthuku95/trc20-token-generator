@@ -63,6 +63,43 @@ contract TokenFactoryTest is Test {
         assertEq(token.allowance(recipient, spender), 6 * 10 ** 6);
     }
 
+    function test_CreateTokenVanityMintsToCreator() public {
+        vm.prank(creator);
+        bytes32 salt = keccak256("mint-test");
+        address tokenAddress = factory.createTokenVanity("Mint Token", "MNT", 500, 6, "", salt);
+
+        Token token = Token(tokenAddress);
+        assertEq(token.owner(), creator);
+        assertEq(token.balanceOf(creator), 500 * 10 ** 6);
+    }
+
+    function test_CreateTokenVanityPredictsDeterministically() public {
+        vm.prank(creator);
+        bytes32 salt = keccak256("vanity-salt");
+        bytes32 differentSalt = keccak256("other-salt");
+
+        address predicted1 = factory.predictTokenAddress("Vanity", "VNY", 1000, 8, "", creator, salt);
+        address predicted2 = factory.predictTokenAddress("Vanity", "VNY", 1000, 8, "", creator, salt);
+        address predicted3 = factory.predictTokenAddress("Vanity", "VNY", 1000, 8, "", creator, differentSalt);
+
+        assertEq(predicted1, predicted2, "same salt must give same address");
+        assertTrue(predicted1 != predicted3, "different salt must give different address");
+    }
+
+    function test_CreateTokenVanityTracksFactoryTokens() public {
+        vm.prank(creator);
+        bytes32 salt = keccak256("track-test");
+        address tokenAddress = factory.createTokenVanity("Track Token", "TRK", 100, 2, "", salt);
+
+        address[] memory allTokens = factory.getDeployedTokens();
+        assertEq(allTokens.length, 1);
+        assertEq(allTokens[0], tokenAddress);
+
+        address[] memory creatorTokens = factory.getTokensByCreator(creator);
+        assertEq(creatorTokens.length, 1);
+        assertEq(creatorTokens[0], tokenAddress);
+    }
+
     function test_RevertsForInvalidTokenDetails() public {
         vm.expectRevert("Invalid name length");
         factory.createToken("No", "NO", 1, 6, "");

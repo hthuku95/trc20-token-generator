@@ -7,7 +7,7 @@ import { ReviewPanel } from './components/ReviewPanel';
 import { SuccessCard } from './components/SuccessCard';
 import { TokenForm } from './components/TokenForm';
 import { WalletConnectButton } from './components/WalletConnectButton';
-import { deployToken, getFactoryAddress, getWalletSnapshot } from './services/tronLink';
+import { deployToken, deployTokenVanity, getFactoryAddress, getWalletSnapshot } from './services/tronLink';
 import { useDappStore } from './store/useDappStore';
 import type { TokenFormValues } from './types/tron';
 
@@ -28,18 +28,18 @@ function App() {
 
   const deployment = useMutation({
     mutationFn: (values: TokenFormValues) =>
-      deployToken(values, {
+      (values.vanitySalt ? deployTokenVanity : deployToken)(values, {
         onStatusChange: setDeploymentStatus,
         onTransactionHash: setTransactionHash,
       }),
     onSuccess: (deploymentResult) => {
-      setDeploymentStatus('success');
+      setDeploymentStatus("success");
       setResult(deploymentResult);
-      toast.success('Token deployed');
+      toast.success("Token deployed");
     },
     onError: (error) => {
-      setDeploymentStatus('error');
-      toast.error(error instanceof Error ? error.message : 'Deployment failed');
+      setDeploymentStatus("error");
+      toast.error(error instanceof Error ? error.message : "Deployment failed");
     },
   });
 

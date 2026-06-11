@@ -1,3 +1,4 @@
+import TronWeb from 'tronweb';
 import { tokenFactoryAbi } from '../contracts/tokenFactoryAbi';
 import type { DeploymentResult, DeploymentStatus, TokenFormValues, TronWebLike } from '../types/tron';
 import { detectNetwork } from '../utils/network';
@@ -83,9 +84,118 @@ export async function addTokenToWallet(
   });
 }
 
+export interface VanitySearchProgress {
+  checked: number;
+  speed: number;
+  elapsed: number;
+  found: boolean;
+  address: string;
+  salt: string;
+}
+
+export async function findVanitySalt(
+  values: TokenFormValues,
+  factoryAddress: string,
+  walletAddress: string,
+  onProgress: (progress: VanitySearchProgress) => void,
+  signal?: AbortSignal,
+): Promise<{ salt: string; address: string } | null> {
+  const tronWeb = getTronWeb();
+  if (!tronWeb) throw new Error('TronLink not connected.');
+
+  const factory = await tronWeb.contract([...tokenFactoryAbi], factoryAddress);
+  const initCodeHash: string = await factory.getInitCodeHash(
+    values.name.trim(), values.symbol.trim().toUpperCase(), values.supply.trim(), values.decimals, values.iconUrl, walletAddress,
+  ).call();
+  const initCodeHashClean = initCodeHash.replace('0x', '');
+
+  const factoryHex = tronWeb.address.toHex(factoryAddress);
+  const factoryRaw = factoryHex.replace('0x41', '').toLowerCase();
+
+  const pattern = values.vanityPattern.trim().toUpperCase();
+  if (!pattern) throw new Error('Enter a vanity pattern.');
+
+  const startSalt = BigInt('0x' + crypto.randomUUID().replace(/-/g, '').slice(0, 16)) << BigInt(64);
+  const startTime = Date.now();
+  let checked = 0;
+
+  for (let i = BigInt(0); ; i++) {
+    const salt = startSalt + i;
+    const saltHex = salt.toString(16).padStart(64, '0');
+    const preimage = '0x41' + factoryRaw + saltHex + initCodeHashClean;
+    const fullHash: string = (TronWeb as any).sha3(preimage);
+    const rawAddr = fullHash.slice(-40);
+    const tronHex = '41' + rawAddr;
+    const base58 = tronWeb.address.fromHex('0x' + tronHex);
+
+    checked++;
+    if (checked % 1000 === 0) {
+      const elapsed = (Date.now() - startTime) / 1000;
+      const speed = Math.floor(checked / elapsed);
+      onProgress({ checked, speed, elapsed, found: false, address: base58, salt: '0x' + saltHex });
+
+      if (signal?.aborted) return null;
+      await new Promise(r => setTimeout(r, 0));
+    }
+
+    if (base58.slice(1).startsWith(pattern)) {
+      onProgress({ checked, speed: Math.floor(checked / ((Date.now() - startTime) / 1000)), elapsed: (Date.now() - startTime) / 1000, found: true, address: base58, salt: '0x' + saltHex });
+      return { salt: '0x' + saltHex, address: base58 };
+    }
+  }
+}
+
 interface DeployTokenOptions {
   onStatusChange?: (status: DeploymentStatus) => void;
   onTransactionHash?: (transactionHash: string) => void;
+}
+
+export async function deployTokenVanity(
+  values: TokenFormValues,
+  options: DeployTokenOptions = {},
+): Promise<DeploymentResult> {
+  const tronWeb = getTronWeb();
+  const snapshot = getWalletSnapshot();
+
+  if (!tronWeb || !snapshot.walletAddress) {
+    throw new Error('Connect Wallet.');
+  }
+
+  if (snapshot.network !== 'nile') {
+    throw new Error('Unsupported network. Switch TronLink to Nile Testnet.');
+  }
+
+  if (!FACTORY_ADDRESS) {
+    throw new Error('Missing VITE_FACTORY_ADDRESS.');
+  }
+
+  if (!values.vanitySalt) {
+    throw new Error('No vanity salt found. Search for an address first.');
+  }
+
+  const factory = await tronWeb.contract([...tokenFactoryAbi], FACTORY_ADDRESS);
+  options.onStatusChange?.('awaiting_signature');
+
+  const transactionHash = await factory
+    .createTokenVanity(values.name.trim(), values.symbol.trim().toUpperCase(), values.supply.trim(), values.decimals, values.iconUrl, values.vanitySalt)
+    .send();
+
+  options.onTransactionHash?.(transactionHash);
+  options.onStatusChange?.('broadcasting');
+  options.onStatusChange?.('confirming');
+
+  const receipt = await waitForTransactionConfirmation(tronWeb, transactionHash);
+  const contractAddress = readTokenAddressFromReceipt(receipt);
+
+  return {
+    ...values,
+    name: values.name.trim(),
+    symbol: values.symbol.trim().toUpperCase(),
+    contractAddress,
+    transactionHash,
+    ownerAddress: snapshot.walletAddress,
+    network: snapshot.network,
+  };
 }
 
 export async function deployToken(
