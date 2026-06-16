@@ -1,7 +1,9 @@
-import { Copy, ExternalLink, PlusCircle, Wallet } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Copy, ExternalLink, PlusCircle, Wallet, DollarSign, Link, RefreshCw } from 'lucide-react';
 import type { ReactElement } from 'react';
 import toast from 'react-hot-toast';
-import { addTokenToWallet } from '../services/tronLink';
+import { addTokenToWallet, getFactoryAddress, linkOracleToToken, readOraclePrice, setOraclePrice } from '../services/tronLink';
+import { getFactoryContract } from '../services/tronLink';
 import type { DeploymentResult } from '../types/tron';
 import { getTronScanAddressUrl, getTronScanTxUrl } from '../utils/network';
 
@@ -11,13 +13,66 @@ interface SuccessCardProps {
 }
 
 export function SuccessCard({ result, onCreateAnother }: SuccessCardProps) {
+  const [oracleLocalAddress, setOracleLocalAddress] = useState('');
+  const [linking, setLinking] = useState(false);
+  const [currentPrice, setCurrentPrice] = useState<string | null>(null);
+  const [priceInput, setPriceInput] = useState('');
+  const [settingPrice, setSettingPrice] = useState(false);
+  const [existingOracle, setExistingOracle] = useState('');
+
+  useEffect(() => {
+    if (!result) return;
+    (async () => {
+      try {
+        const factory = await getFactoryContract();
+        const addr: string = await factory.tokenPriceOracles(result.contractAddress).call();
+        if (addr && addr !== 'T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb') {
+          setExistingOracle(addr);
+          const price = await readOraclePrice(addr);
+          setCurrentPrice(price);
+        }
+      } catch {}
+    })();
+  }, [result]);
+
   if (!result) {
     return null;
   }
 
-  async function copy(value: string, label: string) {
-    await navigator.clipboard.writeText(value);
-    toast.success(`${label} copied`);
+  async function handleLinkOracle() {
+    if (!oracleLocalAddress.trim()) return;
+    setLinking(true);
+    try {
+      await linkOracleToToken(result!.contractAddress, oracleLocalAddress.trim());
+      setExistingOracle(oracleLocalAddress.trim());
+      toast.success('Oracle linked to token');
+    } catch {
+      toast.error('Failed to link oracle');
+    }
+    setLinking(false);
+  }
+
+  async function handleSetPrice() {
+    if (!priceInput.trim() || !existingOracle) return;
+    setSettingPrice(true);
+    try {
+      await setOraclePrice(existingOracle, priceInput.trim());
+      setCurrentPrice(priceInput.trim());
+      toast.success('Price updated');
+    } catch {
+      toast.error('Failed to set price');
+    }
+    setSettingPrice(false);
+  }
+
+  async function handleRefreshPrice() {
+    if (!existingOracle) return;
+    try {
+      const price = await readOraclePrice(existingOracle);
+      setCurrentPrice(price);
+    } catch {
+      toast.error('Failed to read price');
+    }
   }
 
   return (
@@ -40,6 +95,80 @@ export function SuccessCard({ result, onCreateAnother }: SuccessCardProps) {
         {result.anchorPrice ? <ResultRow label="Anchor Price" value={result.anchorPrice} /> : null}
         <ResultRow label="Owner Address" value={result.ownerAddress} />
       </dl>
+
+      {!existingOracle && (
+        <div className="mt-6 rounded-md border border-line/70 bg-ink/40 p-4">
+          <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-200">
+            <DollarSign className="h-4 w-4" />
+            Price Oracle <span className="text-xs font-normal text-slate-500">(optional)</span>
+          </h3>
+          <p className="mb-3 text-xs text-slate-400">
+            Deploy a TokenPriceOracle contract, then paste its address below to link it to your token.
+          </p>
+          <div className="flex gap-2">
+            <input
+              value={oracleLocalAddress}
+              onChange={(e) => setOracleLocalAddress(e.target.value)}
+              placeholder="Oracle contract address"
+              className="h-10 flex-1 rounded-md border border-line bg-ink/60 px-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-mint"
+            />
+            <button
+              type="button"
+              onClick={handleLinkOracle}
+              disabled={linking || !oracleLocalAddress.trim()}
+              className="inline-flex h-10 items-center gap-2 rounded-md border border-line px-3 text-sm font-semibold text-slate-100 transition hover:border-mint disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Link className="h-4 w-4" />
+              {linking ? 'Linking...' : 'Link'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {existingOracle && (
+        <div className="mt-6 rounded-md border border-mint/30 bg-mint/5 p-4">
+          <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-200">
+            <DollarSign className="h-4 w-4" />
+            Price Oracle
+          </h3>
+          <div className="mb-3 text-xs text-slate-400 break-all">
+            Oracle: {existingOracle}
+          </div>
+          {currentPrice !== null && (
+            <div className="mb-3 flex items-center gap-2 text-sm">
+              <span className="text-slate-400">Current Price:</span>
+              <span className="font-semibold text-white">
+                {BigInt(currentPrice) > BigInt(10**15)
+                  ? (Number(currentPrice) / 10**18).toFixed(6)
+                  : currentPrice}
+              </span>
+              <button
+                type="button"
+                onClick={handleRefreshPrice}
+                className="text-slate-400 hover:text-white"
+              >
+                <RefreshCw className="h-3 w-3" />
+              </button>
+            </div>
+          )}
+          <div className="flex gap-2">
+            <input
+              value={priceInput}
+              onChange={(e) => setPriceInput(e.target.value)}
+              placeholder="Price in USD (e.g. 0.01)"
+              className="h-10 flex-1 rounded-md border border-line bg-ink/60 px-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-mint"
+            />
+            <button
+              type="button"
+              onClick={handleSetPrice}
+              disabled={settingPrice || !priceInput.trim()}
+              className="inline-flex h-10 items-center gap-2 rounded-md bg-mint px-3 text-sm font-semibold text-ink transition hover:bg-mint/90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {settingPrice ? 'Setting...' : 'Set Price'}
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="mt-6 flex flex-wrap gap-3">
         <ActionButton onClick={() => copy(result.contractAddress, 'Address')} label="Copy Address" icon={<Copy />} />
@@ -108,4 +237,9 @@ function ActionButton({
       {label}
     </button>
   );
+}
+
+async function copy(value: string, label: string) {
+  await navigator.clipboard.writeText(value);
+  toast.success(`${label} copied`);
 }

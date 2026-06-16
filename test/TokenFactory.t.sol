@@ -11,7 +11,7 @@ contract TokenFactoryTest is Test {
     address private recipient = address(0xB0B);
     address private spender = address(0xCAFE);
 
-    event TokenCreated(address indexed creator, address indexed tokenAddress, string name, string symbol, string iconUrl, string anchorPrice);
+    event TokenCreated(address indexed creator, address indexed tokenAddress, string iconUrl, string anchorPrice);
 
     function setUp() public {
         factory = new TokenFactory();

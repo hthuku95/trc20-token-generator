@@ -18,8 +18,6 @@ export const tokenFactoryAbi = [
     inputs: [
       { indexed: true, internalType: 'address', name: 'creator', type: 'address' },
       { indexed: true, internalType: 'address', name: 'tokenAddress', type: 'address' },
-      { indexed: false, internalType: 'string', name: 'name', type: 'string' },
-      { indexed: false, internalType: 'string', name: 'symbol', type: 'string' },
       { indexed: false, internalType: 'string', name: 'iconUrl', type: 'string' },
       { indexed: false, internalType: 'string', name: 'anchorPrice', type: 'string' },
     ],
@@ -68,6 +66,30 @@ export const tokenFactoryAbi = [
     name: 'getInitCodeHash',
     outputs: [{ internalType: 'bytes32', name: '', type: 'bytes32' }],
     stateMutability: 'pure',
+    type: 'function',
+  },
+  {
+    inputs: [
+      { internalType: 'address', name: 'token', type: 'address' },
+      { internalType: 'address', name: 'oracle', type: 'address' },
+    ],
+    name: 'setTokenPriceOracle',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [{ internalType: 'address', name: 'token', type: 'address' }],
+    name: 'tokenPriceOracles',
+    outputs: [{ internalType: 'address', name: '', type: 'address' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [{ internalType: 'address', name: 'token', type: 'address' }],
+    name: 'anchorPrices',
+    outputs: [{ internalType: 'string', name: '', type: 'string' }],
+    stateMutability: 'view',
     type: 'function',
   },
 ] as const;

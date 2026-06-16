@@ -35,6 +35,12 @@ export interface TronViewCall<T> {
   call: () => Promise<T>;
 }
 
+export interface OracleContract {
+  oracleAddress: () => TronViewCall<string>;
+  tokenValue: () => TronViewCall<string>;
+  setTokenValue: (value: string | number) => TronContractCall;
+}
+
 export interface TokenFactoryContract {
   createToken: (
     name: string,
@@ -70,6 +76,12 @@ export interface TokenFactoryContract {
     iconUrl: string,
     owner: string,
   ) => TronViewCall<string>;
+  setTokenPriceOracle: (
+    token: string,
+    oracle: string,
+  ) => TronContractCall;
+  tokenPriceOracles: (token: string) => TronViewCall<string>;
+  anchorPrices: (token: string) => TronViewCall<string>;
 }
 
 export interface TronWebLike {

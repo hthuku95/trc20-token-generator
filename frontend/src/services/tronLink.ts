@@ -1,6 +1,7 @@
 import TronWeb from 'tronweb';
 import { tokenFactoryAbi } from '../contracts/tokenFactoryAbi';
-import type { DeploymentResult, DeploymentStatus, TokenFormValues, TronWebLike } from '../types/tron';
+import { oracleAbi } from '../contracts/oracleAbi';
+import type { DeploymentResult, DeploymentStatus, TokenFormValues, OracleContract, TronWebLike } from '../types/tron';
 import { detectNetwork } from '../utils/network';
 
 const FACTORY_ADDRESS = import.meta.env.VITE_FACTORY_ADDRESS ?? '';
@@ -268,4 +269,34 @@ function readTokenAddressFromReceipt(receipt: Record<string, unknown>) {
   }
 
   return 'Check transaction on TronScan';
+}
+
+export async function getFactoryContract() {
+  const tronWeb = getTronWeb();
+  if (!tronWeb) throw new Error('TronLink not connected.');
+  return tronWeb.contract([...tokenFactoryAbi], FACTORY_ADDRESS) as unknown as import('../types/tron').TokenFactoryContract;
+}
+
+export async function getOracleContract(address: string): Promise<OracleContract> {
+  const tronWeb = getTronWeb();
+  if (!tronWeb) throw new Error('TronLink not connected.');
+  return tronWeb.contract([...oracleAbi], address) as unknown as OracleContract;
+}
+
+export async function linkOracleToToken(tokenAddress: string, oracleAddress: string) {
+  const tronWeb = getTronWeb();
+  if (!tronWeb) throw new Error('TronLink not connected.');
+  const factory = await tronWeb.contract([...tokenFactoryAbi], FACTORY_ADDRESS);
+  await factory.setTokenPriceOracle(tokenAddress, oracleAddress).send();
+}
+
+export async function readOraclePrice(oracleAddress: string): Promise<string> {
+  const oracle = await getOracleContract(oracleAddress);
+  const value: string = await oracle.tokenValue().call();
+  return value;
+}
+
+export async function setOraclePrice(oracleAddress: string, price: string) {
+  const oracle = await getOracleContract(oracleAddress);
+  await oracle.setTokenValue(price).send();
 }

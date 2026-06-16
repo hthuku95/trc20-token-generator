@@ -7,8 +7,9 @@ contract TokenFactory {
     address[] private deployedTokens;
     mapping(address => address[]) private tokensByCreator;
     mapping(address => string) public anchorPrices;
+    mapping(address => address) public tokenPriceOracles;
 
-    event TokenCreated(address indexed creator, address indexed tokenAddress, string name, string symbol, string iconUrl, string anchorPrice);
+    event TokenCreated(address indexed creator, address indexed tokenAddress, string iconUrl, string anchorPrice);
 
     function createToken(
         string calldata name,
@@ -25,7 +26,7 @@ contract TokenFactory {
         tokensByCreator[msg.sender].push(tokenAddress);
         anchorPrices[tokenAddress] = anchorPrice;
 
-        emit TokenCreated(msg.sender, tokenAddress, name, symbol, iconUrl, anchorPrice);
+        emit TokenCreated(msg.sender, tokenAddress, iconUrl, anchorPrice);
     }
 
     function createTokenVanity(
@@ -44,7 +45,13 @@ contract TokenFactory {
         tokensByCreator[msg.sender].push(tokenAddress);
         anchorPrices[tokenAddress] = anchorPrice;
 
-        emit TokenCreated(msg.sender, tokenAddress, name, symbol, iconUrl, anchorPrice);
+        emit TokenCreated(msg.sender, tokenAddress, iconUrl, anchorPrice);
+    }
+
+    function setTokenPriceOracle(address token, address oracle) external {
+        require(tokenPriceOracles[token] == address(0), "Oracle already set");
+        require(bytes(anchorPrices[token]).length > 0, "Token not created by this factory");
+        tokenPriceOracles[token] = oracle;
     }
 
     function predictTokenAddress(
