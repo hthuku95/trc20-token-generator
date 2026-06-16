@@ -6,23 +6,26 @@ import {Token} from "./Token.sol";
 contract TokenFactory {
     address[] private deployedTokens;
     mapping(address => address[]) private tokensByCreator;
+    mapping(address => string) public anchorPrices;
 
-    event TokenCreated(address indexed creator, address indexed tokenAddress, string name, string symbol, string iconUrl);
+    event TokenCreated(address indexed creator, address indexed tokenAddress, string name, string symbol, string iconUrl, string anchorPrice);
 
     function createToken(
         string calldata name,
         string calldata symbol,
         uint256 supply,
         uint8 decimals,
-        string calldata iconUrl
+        string calldata iconUrl,
+        string calldata anchorPrice
     ) external returns (address tokenAddress) {
         Token token = new Token(name, symbol, supply, decimals, msg.sender, iconUrl);
         tokenAddress = address(token);
 
         deployedTokens.push(tokenAddress);
         tokensByCreator[msg.sender].push(tokenAddress);
+        anchorPrices[tokenAddress] = anchorPrice;
 
-        emit TokenCreated(msg.sender, tokenAddress, name, symbol, iconUrl);
+        emit TokenCreated(msg.sender, tokenAddress, name, symbol, iconUrl, anchorPrice);
     }
 
     function createTokenVanity(
@@ -31,6 +34,7 @@ contract TokenFactory {
         uint256 supply,
         uint8 decimals,
         string calldata iconUrl,
+        string calldata anchorPrice,
         bytes32 salt
     ) external returns (address tokenAddress) {
         Token token = new Token{salt: salt}(name, symbol, supply, decimals, msg.sender, iconUrl);
@@ -38,8 +42,9 @@ contract TokenFactory {
 
         deployedTokens.push(tokenAddress);
         tokensByCreator[msg.sender].push(tokenAddress);
+        anchorPrices[tokenAddress] = anchorPrice;
 
-        emit TokenCreated(msg.sender, tokenAddress, name, symbol, iconUrl);
+        emit TokenCreated(msg.sender, tokenAddress, name, symbol, iconUrl, anchorPrice);
     }
 
     function predictTokenAddress(

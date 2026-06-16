@@ -29,6 +29,7 @@ export function ReviewPanel({ token, network, factoryAddress, disabled, onDeploy
         <ReviewRow label="Network" value={getNetworkLabel(network)} />
         <ReviewRow label="Factory" value={factoryAddress || 'Set VITE_FACTORY_ADDRESS'} />
         {token?.iconUrl ? <ReviewRow label="Token Icon" value={token.iconUrl} /> : null}
+        {token?.anchorPrice ? <ReviewRow label="Anchor Price" value={token.anchorPrice} /> : null}
       </dl>
 
       <button

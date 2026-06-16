@@ -37,6 +37,7 @@ export function SuccessCard({ result, onCreateAnother }: SuccessCardProps) {
         <ResultRow label="Symbol" value={result.symbol} />
         <ResultRow label="Contract Address" value={result.contractAddress} />
         <ResultRow label="Transaction Hash" value={result.transactionHash} />
+        {result.anchorPrice ? <ResultRow label="Anchor Price" value={result.anchorPrice} /> : null}
         <ResultRow label="Owner Address" value={result.ownerAddress} />
       </dl>
 

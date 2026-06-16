@@ -177,7 +177,7 @@ export async function deployTokenVanity(
   options.onStatusChange?.('awaiting_signature');
 
   const transactionHash = await factory
-    .createTokenVanity(values.name.trim(), values.symbol.trim().toUpperCase(), values.supply.trim(), values.decimals, values.iconUrl, values.vanitySalt)
+    .createTokenVanity(values.name.trim(), values.symbol.trim().toUpperCase(), values.supply.trim(), values.decimals, values.iconUrl, values.anchorPrice.trim(), values.vanitySalt)
     .send();
 
   options.onTransactionHash?.(transactionHash);
@@ -221,7 +221,7 @@ export async function deployToken(
   options.onStatusChange?.('awaiting_signature');
 
   const transactionHash = await factory
-    .createToken(values.name.trim(), values.symbol.trim().toUpperCase(), values.supply.trim(), values.decimals, values.iconUrl)
+    .createToken(values.name.trim(), values.symbol.trim().toUpperCase(), values.supply.trim(), values.decimals, values.iconUrl, values.anchorPrice.trim())
     .send();
 
   options.onTransactionHash?.(transactionHash);

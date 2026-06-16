@@ -14,6 +14,7 @@ const initialValues: TokenFormValues = {
   supply: '1000000',
   decimals: 6,
   iconUrl: '',
+  anchorPrice: '',
   vanityPattern: '',
   vanitySalt: '',
   vanityAddress: '',
@@ -42,6 +43,7 @@ export function TokenForm({ disabled, onReview }: TokenFormProps) {
       supply: values.supply.trim(),
       decimals: values.decimals,
       iconUrl: values.iconUrl.trim(),
+      anchorPrice: values.anchorPrice.trim(),
       vanityPattern: values.vanityPattern,
       vanitySalt: values.vanitySalt,
       vanityAddress: values.vanityAddress,
@@ -122,6 +124,18 @@ export function TokenForm({ disabled, onReview }: TokenFormProps) {
           className="h-12 w-full rounded-md border border-line bg-ink/60 px-4 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-mint"
         />
         {submitted && errors.iconUrl ? <span className="text-sm text-coral">{errors.iconUrl}</span> : null}
+      </label>
+
+      <label className="space-y-2">
+        <span className="text-sm font-medium text-slate-300">Anchor Price <span className="text-slate-500">(optional)</span></span>
+        <input
+          value={values.anchorPrice}
+          onChange={(event) => updateValue('anchorPrice', event.target.value)}
+          placeholder="0.01"
+          disabled={disabled}
+          className="h-12 w-full rounded-md border border-line bg-ink/60 px-4 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-mint"
+        />
+        {submitted && errors.anchorPrice ? <span className="text-sm text-coral">{errors.anchorPrice}</span> : null}
       </label>
 
       <div className="flex flex-wrap gap-3">

@@ -14,6 +14,7 @@ export interface TokenFormValues {
   supply: string;
   decimals: number;
   iconUrl: string;
+  anchorPrice: string;
   vanityPattern: string;
   vanitySalt: string;
   vanityAddress: string;
@@ -41,6 +42,7 @@ export interface TokenFactoryContract {
     supply: string | number,
     decimals: number,
     iconUrl: string,
+    anchorPrice: string,
   ) => TronContractCall;
   createTokenVanity: (
     name: string,
@@ -48,6 +50,7 @@ export interface TokenFactoryContract {
     supply: string | number,
     decimals: number,
     iconUrl: string,
+    anchorPrice: string,
     salt: string,
   ) => TronContractCall;
   predictTokenAddress: (

@@ -11,7 +11,7 @@ contract TokenFactoryTest is Test {
     address private recipient = address(0xB0B);
     address private spender = address(0xCAFE);
 
-    event TokenCreated(address indexed creator, address indexed tokenAddress, string name, string symbol, string iconUrl);
+    event TokenCreated(address indexed creator, address indexed tokenAddress, string name, string symbol, string iconUrl, string anchorPrice);
 
     function setUp() public {
         factory = new TokenFactory();
@@ -19,7 +19,7 @@ contract TokenFactoryTest is Test {
 
     function test_CreateTokenMintsInitialSupplyToCreator() public {
         vm.prank(creator);
-        address tokenAddress = factory.createToken("My Token", "MTK", 1_000_000, 6, "");
+        address tokenAddress = factory.createToken("My Token", "MTK", 1_000_000, 6, "", "");
 
         Token token = Token(tokenAddress);
 
@@ -33,7 +33,7 @@ contract TokenFactoryTest is Test {
 
     function test_CreateTokenTracksFactoryAndCreatorTokens() public {
         vm.prank(creator);
-        address tokenAddress = factory.createToken("Launch Token", "LCH", 500, 2, "");
+        address tokenAddress = factory.createToken("Launch Token", "LCH", 500, 2, "", "");
 
         address[] memory allTokens = factory.getDeployedTokens();
         address[] memory creatorTokens = factory.getTokensByCreator(creator);
@@ -46,7 +46,7 @@ contract TokenFactoryTest is Test {
 
     function test_TokenTransfersAndAllowances() public {
         vm.prank(creator);
-        Token token = Token(factory.createToken("Spend Token", "SPND", 100, 6, ""));
+        Token token = Token(factory.createToken("Spend Token", "SPND", 100, 6, "", ""));
 
         vm.prank(creator);
         assertTrue(token.transfer(recipient, 25 * 10 ** 6));
@@ -66,7 +66,7 @@ contract TokenFactoryTest is Test {
     function test_CreateTokenVanityMintsToCreator() public {
         vm.prank(creator);
         bytes32 salt = keccak256("mint-test");
-        address tokenAddress = factory.createTokenVanity("Mint Token", "MNT", 500, 6, "", salt);
+        address tokenAddress = factory.createTokenVanity("Mint Token", "MNT", 500, 6, "", "", salt);
 
         Token token = Token(tokenAddress);
         assertEq(token.owner(), creator);
@@ -89,7 +89,7 @@ contract TokenFactoryTest is Test {
     function test_CreateTokenVanityTracksFactoryTokens() public {
         vm.prank(creator);
         bytes32 salt = keccak256("track-test");
-        address tokenAddress = factory.createTokenVanity("Track Token", "TRK", 100, 2, "", salt);
+        address tokenAddress = factory.createTokenVanity("Track Token", "TRK", 100, 2, "", "", salt);
 
         address[] memory allTokens = factory.getDeployedTokens();
         assertEq(allTokens.length, 1);
@@ -102,15 +102,15 @@ contract TokenFactoryTest is Test {
 
     function test_RevertsForInvalidTokenDetails() public {
         vm.expectRevert("Invalid name length");
-        factory.createToken("No", "NO", 1, 6, "");
+        factory.createToken("No", "NO", 1, 6, "", "");
 
         vm.expectRevert("Invalid symbol length");
-        factory.createToken("Valid Name", "N", 1, 6, "");
+        factory.createToken("Valid Name", "N", 1, 6, "", "");
 
         vm.expectRevert("Supply must be positive");
-        factory.createToken("Valid Name", "VAL", 0, 6, "");
+        factory.createToken("Valid Name", "VAL", 0, 6, "", "");
 
         vm.expectRevert("Decimals too high");
-        factory.createToken("Valid Name", "VAL", 1, 19, "");
+        factory.createToken("Valid Name", "VAL", 1, 19, "", "");
     }
 }
