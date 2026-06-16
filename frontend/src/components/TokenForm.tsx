@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
-import { ArrowRight, Coins, RotateCcw } from 'lucide-react';
+import { useMemo, useRef, useState } from 'react';
+import { ArrowRight, Coins, RotateCcw, Search, X } from 'lucide-react';
 import type { TokenFormValues } from '../types/tron';
 import { hasFormErrors, validateTokenForm } from '../utils/tokenForm';
+import { findVanitySalt, getFactoryAddress, getWalletSnapshot } from '../services/tronLink';
 
 interface TokenFormProps {
   disabled: boolean;
@@ -23,6 +24,10 @@ const initialValues: TokenFormValues = {
 export function TokenForm({ disabled, onReview }: TokenFormProps) {
   const [values, setValues] = useState<TokenFormValues>(initialValues);
   const [submitted, setSubmitted] = useState(false);
+  const [vanityEnabled, setVanityEnabled] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const [progress, setProgress] = useState({ checked: 0, speed: 0, elapsed: 0, found: false, address: '', salt: '' });
+  const abortRef = useRef<AbortController | null>(null);
   const errors = useMemo(() => validateTokenForm(values), [values]);
 
   function updateValue<Key extends keyof TokenFormValues>(key: Key, value: TokenFormValues[Key]) {
@@ -37,7 +42,7 @@ export function TokenForm({ disabled, onReview }: TokenFormProps) {
       return;
     }
 
-      onReview({
+    onReview({
       name: values.name.trim(),
       symbol: values.symbol.trim().toUpperCase(),
       supply: values.supply.trim(),
@@ -53,6 +58,53 @@ export function TokenForm({ disabled, onReview }: TokenFormProps) {
   function resetForm() {
     setValues(initialValues);
     setSubmitted(false);
+    setVanityEnabled(false);
+    setSearching(false);
+    setProgress({ checked: 0, speed: 0, elapsed: 0, found: false, address: '', salt: '' });
+  }
+
+  async function handleVanitySearch() {
+    const snapshot = getWalletSnapshot();
+    const factoryAddress = getFactoryAddress();
+
+    if (!snapshot.walletAddress) {
+      return;
+    }
+
+    if (!factoryAddress) {
+      return;
+    }
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setSearching(true);
+    setProgress({ checked: 0, speed: 0, elapsed: 0, found: false, address: '', salt: '' });
+    updateValue('vanitySalt', '');
+    updateValue('vanityAddress', '');
+
+    try {
+      const result = await findVanitySalt(
+        { ...values, vanityPattern: values.vanityPattern },
+        factoryAddress,
+        snapshot.walletAddress,
+        setProgress,
+        controller.signal,
+      );
+
+      if (result) {
+        updateValue('vanitySalt', result.salt);
+        updateValue('vanityAddress', result.address);
+      }
+    } catch {
+      // aborted or error
+    } finally {
+      setSearching(false);
+      abortRef.current = null;
+    }
+  }
+
+  function cancelSearch() {
+    abortRef.current?.abort();
   }
 
   return (
@@ -137,6 +189,77 @@ export function TokenForm({ disabled, onReview }: TokenFormProps) {
         />
         {submitted && errors.anchorPrice ? <span className="text-sm text-coral">{errors.anchorPrice}</span> : null}
       </label>
+
+      <div className="border-t border-line pt-4">
+        <label className="flex items-center gap-3">
+          <input
+            type="checkbox"
+            checked={vanityEnabled}
+            onChange={() => setVanityEnabled(!vanityEnabled)}
+            disabled={disabled}
+            className="h-5 w-5 rounded border-line bg-ink/60 text-mint focus:ring-mint"
+          />
+          <span className="text-sm font-medium text-slate-300">Vanity Address <span className="text-slate-500">(CREATE2)</span></span>
+        </label>
+
+        {vanityEnabled && (
+          <div className="mt-4 space-y-4">
+            <label className="space-y-2">
+              <span className="text-sm font-medium text-slate-300">
+                Vanity Pattern <span className="text-slate-500">(starts with T)</span>
+              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-lg font-semibold text-slate-400">T</span>
+                <input
+                  value={values.vanityPattern}
+                  onChange={(event) => updateValue('vanityPattern', event.target.value.toUpperCase())}
+                  placeholder="MyToken"
+                  disabled={disabled || searching}
+                  className="h-12 w-full rounded-md border border-line bg-ink/60 px-4 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-mint"
+                />
+              </div>
+            </label>
+
+            <div className="flex gap-2">
+              {!searching ? (
+                <button
+                  type="button"
+                  onClick={handleVanitySearch}
+                  disabled={!values.vanityPattern || disabled}
+                  className="inline-flex h-10 items-center gap-2 rounded-md border border-line px-3 text-sm font-semibold text-slate-100 transition hover:border-mint disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Search className="h-4 w-4" />
+                  Find Vanity Address
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={cancelSearch}
+                  className="inline-flex h-10 items-center gap-2 rounded-md border border-coral/50 px-3 text-sm font-semibold text-coral transition hover:border-coral"
+                >
+                  <X className="h-4 w-4" />
+                  Cancel
+                </button>
+              )}
+            </div>
+
+            {searching && (
+              <div className="rounded-md border border-line/70 bg-ink/40 p-3 text-sm text-slate-300">
+                <p>Checked: {progress.checked.toLocaleString()}</p>
+                <p>Speed: {progress.speed.toLocaleString()} hashes/s</p>
+                <p>Elapsed: {progress.elapsed.toFixed(1)}s</p>
+              </div>
+            )}
+
+            {values.vanityAddress && (
+              <div className="rounded-md border border-mint/40 bg-mint/10 p-3 text-sm">
+                <p className="font-semibold text-white">Vanity Address Found</p>
+                <p className="mt-1 break-words text-slate-200">{values.vanityAddress}</p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       <div className="flex flex-wrap gap-3">
         <button

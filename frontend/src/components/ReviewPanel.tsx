@@ -30,6 +30,7 @@ export function ReviewPanel({ token, network, factoryAddress, disabled, onDeploy
         <ReviewRow label="Factory" value={factoryAddress || 'Set VITE_FACTORY_ADDRESS'} />
         {token?.iconUrl ? <ReviewRow label="Token Icon" value={token.iconUrl} /> : null}
         {token?.anchorPrice ? <ReviewRow label="Anchor Price" value={token.anchorPrice} /> : null}
+        {token?.vanityAddress ? <ReviewRow label="Vanity Address" value={token.vanityAddress} /> : null}
       </dl>
 
       <button
