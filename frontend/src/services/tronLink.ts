@@ -186,7 +186,7 @@ export async function deployTokenVanity(
   options.onStatusChange?.('confirming');
 
   const receipt = await waitForTransactionConfirmation(tronWeb, transactionHash);
-  const contractAddress = readTokenAddressFromReceipt(receipt);
+  const contractAddress = readTokenAddressFromReceipt(tronWeb, receipt);
 
   return {
     ...values,
@@ -230,7 +230,7 @@ export async function deployToken(
   options.onStatusChange?.('confirming');
 
   const receipt = await waitForTransactionConfirmation(tronWeb, transactionHash);
-  const contractAddress = readTokenAddressFromReceipt(receipt);
+  const contractAddress = readTokenAddressFromReceipt(tronWeb, receipt);
 
   return {
     ...values,
@@ -257,18 +257,29 @@ export async function waitForTransactionConfirmation(tronWeb: TronWebLike, trans
   throw new Error('Deployment confirmation timed out.');
 }
 
-function readTokenAddressFromReceipt(receipt: Record<string, unknown>) {
+function readTokenAddressFromReceipt(tronWeb: TronWebLike, receipt: Record<string, unknown>) {
+  let hexAddress: string | null = null;
+
   const contractResult = receipt.contractResult;
 
   if (Array.isArray(contractResult) && typeof contractResult[0] === 'string') {
-    return `41${contractResult[0].slice(-40)}`;
+    hexAddress = `41${contractResult[0].slice(-40)}`;
   }
 
   if (typeof receipt.contract_address === 'string') {
-    return receipt.contract_address;
+    hexAddress = receipt.contract_address;
   }
 
-  return 'Check transaction on TronScan';
+  if (!hexAddress || hexAddress === 'Check transaction on TronScan') {
+    return 'Check transaction on TronScan';
+  }
+
+  try {
+    const normalized = hexAddress.replace('0x', '');
+    return tronWeb.address.fromHex(normalized);
+  } catch {
+    return hexAddress;
+  }
 }
 
 export async function getFactoryContract() {
