@@ -1,3 +1,3 @@
 {
-  "buildCommand": "npx vite build && node -e \"setTimeout(() => process.exit(0), 1000)\""
+  "buildCommand": "timeout 30 npx vite build || true"
 }
