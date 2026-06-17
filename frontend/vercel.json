@@ -1,3 +1,0 @@
-{
-  "buildCommand": "timeout 30 npx vite build || true"
-}
