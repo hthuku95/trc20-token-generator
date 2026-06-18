@@ -257,29 +257,30 @@ export async function waitForTransactionConfirmation(tronWeb: TronWebLike, trans
   throw new Error('Deployment confirmation timed out.');
 }
 
-function readTokenAddressFromReceipt(tronWeb: TronWebLike, receipt: Record<string, unknown>) {
-  let hexAddress: string | null = null;
+const TOKEN_CREATED_EVENT_SIG = 'd5d05a8421149c74fd223cfc823befb883babf9bf0b0e4d6bf9c8fdb70e59bb4';
 
-  const contractResult = receipt.contractResult;
+function readTokenAddressFromReceipt(tronWeb: TronWebLike, receipt: Record<string, unknown>): string {
+  const logs = receipt.log;
 
-  if (Array.isArray(contractResult) && typeof contractResult[0] === 'string') {
-    hexAddress = `41${contractResult[0].slice(-40)}`;
+  if (Array.isArray(logs)) {
+    for (const log of logs) {
+      const topics: unknown = log.topics;
+      if (Array.isArray(topics) && topics.length >= 3) {
+        const eventSig = String(topics[0]).replace('0x', '');
+        if (eventSig === TOKEN_CREATED_EVENT_SIG) {
+          const paddedHex = String(topics[2]).replace('0x', '');
+          const rawHex = paddedHex.slice(-40);
+          try {
+            return tronWeb.address.fromHex('41' + rawHex);
+          } catch {
+            return 'Check transaction on TronScan';
+          }
+        }
+      }
+    }
   }
 
-  if (typeof receipt.contract_address === 'string') {
-    hexAddress = receipt.contract_address;
-  }
-
-  if (!hexAddress || hexAddress === 'Check transaction on TronScan') {
-    return 'Check transaction on TronScan';
-  }
-
-  try {
-    const normalized = hexAddress.replace('0x', '');
-    return tronWeb.address.fromHex(normalized);
-  } catch {
-    return hexAddress;
-  }
+  return 'Check transaction on TronScan';
 }
 
 export async function getFactoryContract() {
