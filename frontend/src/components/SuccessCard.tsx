@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Copy, ExternalLink, PlusCircle, Wallet, DollarSign, Link, RefreshCw, ChevronDown, ChevronRight } from 'lucide-react';
 import type { ReactElement } from 'react';
 import toast from 'react-hot-toast';
-import { addTokenToWallet, getFactoryAddress, linkOracleToToken, readOraclePrice, setOraclePrice } from '../services/tronLink';
+import { addTokenToWallet, deployOracleContract, getFactoryAddress, linkOracleToToken, readOraclePrice, setOraclePrice } from '../services/tronLink';
 import { getFactoryContract } from '../services/tronLink';
 import type { DeploymentResult } from '../types/tron';
 import { getTronScanAddressUrl, getTronScanTxUrl } from '../utils/network';
@@ -15,6 +15,7 @@ interface SuccessCardProps {
 export function SuccessCard({ result, onCreateAnother }: SuccessCardProps) {
   const [oracleLocalAddress, setOracleLocalAddress] = useState('');
   const [linking, setLinking] = useState(false);
+  const [deployingOracle, setDeployingOracle] = useState(false);
   const [currentPrice, setCurrentPrice] = useState<string | null>(null);
   const [priceInput, setPriceInput] = useState('');
   const [settingPrice, setSettingPrice] = useState(false);
@@ -50,6 +51,18 @@ export function SuccessCard({ result, onCreateAnother }: SuccessCardProps) {
       toast.error('Failed to link oracle');
     }
     setLinking(false);
+  }
+
+  async function handleDeployOracle() {
+    setDeployingOracle(true);
+    try {
+      const address = await deployOracleContract();
+      setOracleLocalAddress(address);
+      toast.success('Oracle contract deployed');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed to deploy oracle');
+    }
+    setDeployingOracle(false);
   }
 
   async function handleSetPrice() {
@@ -105,6 +118,19 @@ export function SuccessCard({ result, onCreateAnother }: SuccessCardProps) {
           <p className="mb-3 text-xs text-slate-400">
             Deploy a TokenPriceOracle contract, then paste its address below to link it to your token.
           </p>
+          <button
+            type="button"
+            onClick={handleDeployOracle}
+            disabled={deployingOracle}
+            className="mb-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-mint px-3 text-sm font-semibold text-ink transition hover:bg-mint/90 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {deployingOracle ? 'Deploying...' : 'Deploy Oracle Contract'}
+          </button>
+          <div className="mb-3 flex items-center gap-2">
+            <span className="h-px flex-1 bg-line/50" />
+            <span className="text-xs text-slate-500">or paste existing</span>
+            <span className="h-px flex-1 bg-line/50" />
+          </div>
           <div className="flex gap-2">
             <input
               value={oracleLocalAddress}

@@ -1,6 +1,7 @@
 import TronWeb from 'tronweb';
 import { tokenFactoryAbi } from '../contracts/tokenFactoryAbi';
 import { oracleAbi } from '../contracts/oracleAbi';
+import { oracleBytecode } from '../contracts/oracleBytecode';
 import type { DeploymentResult, DeploymentStatus, TokenFormValues, OracleContract, TronWebLike } from '../types/tron';
 import { detectNetwork } from '../utils/network';
 
@@ -281,6 +282,33 @@ function readTokenAddressFromReceipt(tronWeb: TronWebLike, receipt: Record<strin
   }
 
   return 'Check transaction on TronScan';
+}
+
+export async function deployOracleContract(): Promise<string> {
+  const tronWeb = getTronWeb();
+  const snapshot = getWalletSnapshot();
+
+  if (!tronWeb || !snapshot.walletAddress) {
+    throw new Error('Connect Wallet.');
+  }
+
+  if (snapshot.network !== 'nile') {
+    throw new Error('Unsupported network. Switch TronLink to Nile Testnet.');
+  }
+
+  const instance = await (tronWeb as any).contract().new({
+    abi: oracleAbi,
+    bytecode: oracleBytecode,
+    feeLimit: 100_000_000,
+    callValue: 0,
+    userFeePercentage: 100,
+    originEnergyLimit: 10_000_000,
+    parameters: [snapshot.walletAddress],
+  });
+
+  const address: string = instance.address || instance.contract_address;
+  if (!address) throw new Error('Could not determine oracle contract address.');
+  return address;
 }
 
 export async function getFactoryContract() {
