@@ -4,7 +4,8 @@
  * Fetches a token price from CoinGecko and pushes it to
  * the TokenPriceOracle contract on-chain via the oracle address.
  *
- * Designed for automation with CRON or PM2 (see notes below).
+ * Designed for automation with CRON or PM2 (see usage examples after the
+ * require() calls below).
  *
  * Setup:
  *   1. npm install tronweb dotenv
@@ -17,17 +18,16 @@
  *
  * Usage:
  *   node scripts/oracle-bot.js
- *
- * Automation:
- *   CRON (every 15 minutes):
- *     */15 * * * * cd /path/to/project && node scripts/oracle-bot.js >> /var/log/oracle.log 2>&1
- *
- *   PM2 (process manager):
- *     pm2 start scripts/oracle-bot.js --name oracle-bot --cron-restart="*/15 * * * *"
  */
 
 const TronWeb = require('tronweb');
 require('dotenv').config();
+
+// Automation examples (CRON/PM2):
+//   CRON (every 15 min):
+//     */15 * * * * cd /path/to/project && node scripts/oracle-bot.js >> /var/log/oracle.log 2>&1
+//   PM2:
+//     pm2 start scripts/oracle-bot.js --name oracle-bot --cron-restart="*/15 * * * *"
 
 const ORACLE_PRIVATE_KEY = process.env.PRIVATE_KEY_NILE;
 const ORACLE_CONTRACT = process.env.ORACLE_CONTRACT_ADDRESS;
@@ -84,8 +84,14 @@ async function updateOraclePrice() {
     console.log(`[${now()}] Fetched live price from CoinGecko: $${rawPrice}`);
   }
 
-  // 2. Scale to uint256 fixed-point (default 18 decimals like ETH/Wei)
-  const scaledPrice = TronWeb.toBigNumber(rawPrice * 10 ** PRICE_SCALING).toFixed(0);
+  // 2. Scale to uint256 fixed-point using BigInt (avoids floating-point drift)
+  const [whole, frac = ''] = rawPrice.toString().split('.');
+  const decimalsInInput = frac.length;
+  if (decimalsInInput > PRICE_SCALING) {
+    throw new Error(`Price has ${decimalsInInput} decimals, max supported is ${PRICE_SCALING}`);
+  }
+  const scaledStr = whole + frac.padEnd(PRICE_SCALING, '0').slice(0, PRICE_SCALING);
+  const scaledPrice = BigInt(scaledStr).toString();
   console.log(`[${now()}] Scaled price (${PRICE_SCALING} decimals): ${scaledPrice}`);
 
   // 3. Send transaction
@@ -93,13 +99,21 @@ async function updateOraclePrice() {
     const tx = await contract.setTokenValue(scaledPrice).send();
     console.log(`[${now()}] Transaction submitted: ${tx}`);
 
-    // 4. Wait for confirmation
-    const receipt = await tronWeb.trx.getTransactionInfo(tx);
-    if (receipt && receipt.receipt?.result === 'SUCCESS') {
-      console.log(`[${now()}] Price updated successfully in block ${receipt.blockNumber}`);
-    } else {
-      console.warn(`[${now()}] Transaction sent but confirmation uncertain. Receipt:`, JSON.stringify(receipt));
+    // 4. Wait for confirmation (Nile can be slow, poll up to 90s)
+    for (let i = 0; i < 30; i++) {
+      await new Promise(r => setTimeout(r, 3000));
+      const receipt = await tronWeb.trx.getTransactionInfo(tx);
+      if (receipt && Object.keys(receipt).length > 0) {
+        const result = receipt.receipt?.result || receipt.result;
+        if (result === 'SUCCESS') {
+          console.log(`[${now()}] Price updated in block ${receipt.blockNumber}`);
+        } else {
+          console.log(`[${now()}] Transaction result: ${result}`);
+        }
+        return;
+      }
     }
+    console.log(`[${now()}] Timed out waiting for confirmation. Check tx: ${tx}`);
   } catch (err) {
     console.error(`[${now()}] Failed to set price:`, err.message);
   }
