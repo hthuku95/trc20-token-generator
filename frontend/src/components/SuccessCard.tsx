@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Copy, ExternalLink, PlusCircle, Wallet, DollarSign, Link, RefreshCw, ChevronDown, ChevronRight } from 'lucide-react';
+import { Copy, ExternalLink, PlusCircle, Wallet, DollarSign, Link, RefreshCw } from 'lucide-react';
 import type { ReactElement } from 'react';
 import toast from 'react-hot-toast';
 import { addTokenToWallet, deployOracleContract, getFactoryAddress, linkOracleToToken, readOraclePrice, setOraclePrice } from '../services/tronLink';
@@ -194,40 +194,19 @@ export function SuccessCard({ result, onCreateAnother }: SuccessCardProps) {
             </button>
           </div>
 
-          <details className="mt-4 group">
-            <summary className="flex cursor-pointer items-center gap-2 text-xs font-medium text-slate-400 hover:text-slate-200">
-              <ChevronRight className="h-3 w-3 transition group-open:rotate-90" />
-              Oracle Bot Automation Guide
-            </summary>
-            <div className="mt-3 space-y-2 text-xs text-slate-400">
-              <p>
-                Run a bot that periodically fetches the token price from CoinGecko and pushes it to the oracle contract.
-                See <code className="rounded bg-ink/60 px-1 py-0.5 text-slate-300">scripts/oracle-bot.js</code> in the project repo.
-              </p>
-              <p className="font-medium text-slate-300">Quick start:</p>
-              <pre className="overflow-x-auto rounded bg-ink/60 p-2 text-xs text-slate-300">
-{`npm install tronweb dotenv
-# Set in .env:
-#   PRIVATE_KEY_NILE=<oracle_wallet_key>
-#   ORACLE_CONTRACT_ADDRESS=${existingOracle}
-#   COINGECKO_TOKEN_ID=tether
-node scripts/oracle-bot.js`}
-              </pre>
-              <p className="font-medium text-slate-300">Automation:</p>
-              <pre className="overflow-x-auto rounded bg-ink/60 p-2 text-xs text-slate-300">
-{`# CRON (every 15 min):
-*/15 * * * * cd /path/to/project && node scripts/oracle-bot.js >> /var/log/oracle.log 2>&1
-
-# PM2:
-pm2 start scripts/oracle-bot.js --name oracle-bot \\\\
-  --cron-restart="*/15 * * * *"`}
-              </pre>
-              <p className="text-slate-500">
-                ⚠ Keep your oracle wallet funded with TRX for energy fees.
-                The oracle private key controls the stored price — secure it carefully.
-              </p>
+          <div className="mt-4 rounded-md border border-line/50 bg-ink/40 p-3">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-slate-400">Auto price updates</span>
+              <span className="flex items-center gap-1.5 text-green-400">
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-400" />
+                Active via GitHub Actions (every 15 min)
+              </span>
             </div>
-          </details>
+            <p className="mt-1.5 text-xs text-slate-500">
+              Price fetched from CoinGecko and pushed to the oracle automatically.
+              Oracle wallet funded with 100 TRX. No action needed.
+            </p>
+          </div>
         </div>
       )}
 

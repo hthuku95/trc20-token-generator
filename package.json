@@ -1,0 +1,21 @@
+{
+  "name": "trc20-token-generator",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Frontend-only TRON TRC-20 token generator MVP contracts and dApp.",
+  "scripts": {
+    "test:contracts": "forge test",
+    "build:contracts": "forge build",
+    "tronbox:compile": "tronbox compile",
+    "tronbox:migrate:nile": "tronbox migrate --network nile",
+    "tronbox:migrate:mainnet": "tronbox migrate --network mainnet"
+  },
+  "dependencies": {
+    "tronweb": "^5.3.5"
+  },
+  "devDependencies": {
+    "@openzeppelin/contracts": "4.9.6",
+    "dotenv": "^16.4.7",
+    "tronbox": "^3.1.2"
+  }
+}

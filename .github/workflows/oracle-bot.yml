@@ -1,0 +1,30 @@
+name: Oracle Price Bot
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+jobs:
+  update-price:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Push price to oracle
+        run: node scripts/oracle-bot.js
+        env:
+          PRIVATE_KEY_NILE: ${{ secrets.ORACLE_PRIVATE_KEY }}
+          ORACLE_CONTRACT_ADDRESS: ${{ vars.ORACLE_CONTRACT_ADDRESS || 'TW7xsWGbmo1dBhhZkMhGJyiEJPJJ5K7ZU7' }}
+          COINGECKO_TOKEN_ID: ${{ vars.COINGECKO_TOKEN_ID || 'tether' }}
+          TOKEN_PRICE_SCALING: '6'
