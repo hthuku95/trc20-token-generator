@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import { ArrowRight, Coins, RotateCcw, Search, X } from 'lucide-react';
+import toast from 'react-hot-toast';
 import type { TokenFormValues } from '../types/tron';
 import { hasFormErrors, validateTokenForm } from '../utils/tokenForm';
 import { findVanitySalt, getFactoryAddress, getWalletSnapshot } from '../services/tronLink';
@@ -63,15 +64,33 @@ export function TokenForm({ disabled, onReview }: TokenFormProps) {
     setProgress({ checked: 0, speed: 0, elapsed: 0, found: false, address: '', salt: '' });
   }
 
+  const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+
   async function handleVanitySearch() {
+    const pattern = values.vanityPattern.trim().toUpperCase();
+    if (!pattern) return;
+
+    for (const ch of pattern) {
+      if (!BASE58_ALPHABET.includes(ch)) {
+        toast.error(`Invalid character "${ch}" in pattern. Avoid 0, O, I, l.`);
+        return;
+      }
+    }
+
+    if (pattern.length >= 5) {
+      toast('Searching for 5+ characters may take hours. Consider 3-4 characters.', { icon: '⏳' });
+    }
+
     const snapshot = getWalletSnapshot();
     const factoryAddress = getFactoryAddress();
 
     if (!snapshot.walletAddress) {
+      toast.error('Connect TronLink first');
       return;
     }
 
     if (!factoryAddress) {
+      toast.error('Factory address not configured');
       return;
     }
 
@@ -95,8 +114,10 @@ export function TokenForm({ disabled, onReview }: TokenFormProps) {
         updateValue('vanitySalt', result.salt);
         updateValue('vanityAddress', result.address);
       }
-    } catch {
-      // aborted or error
+    } catch (e) {
+      if (e instanceof Error && e.message !== 'aborted') {
+        toast.error(e.message);
+      }
     } finally {
       setSearching(false);
       abortRef.current = null;
@@ -213,11 +234,15 @@ export function TokenForm({ disabled, onReview }: TokenFormProps) {
                 <input
                   value={values.vanityPattern}
                   onChange={(event) => updateValue('vanityPattern', event.target.value.toUpperCase())}
-                  placeholder="MyToken"
+                  placeholder="R3D"
                   disabled={disabled || searching}
                   className="h-12 w-full rounded-md border border-line bg-ink/60 px-4 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-mint"
                 />
               </div>
+              <p className="text-xs text-slate-500">
+                3&ndash;4 chars recommended (seconds to minutes). 5+ chars can take hours.
+                Avoid characters 0, O, I, l.
+              </p>
             </label>
 
             <div className="flex gap-2">

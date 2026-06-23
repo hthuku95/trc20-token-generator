@@ -19,8 +19,11 @@ export function validateTokenForm(values: TokenFormValues) {
   }
 
   if (!Number.isInteger(values.decimals) || values.decimals < 0 || values.decimals > 18) {
-if (values.iconUrl && !/^https?:\/\/.+/.test(values.iconUrl)) {    errors.iconUrl = 'Enter a valid URL (http/https) or leave empty.';  }
     errors.decimals = 'Choose a value from 0 to 18.';
+  }
+
+  if (values.iconUrl && !/^https?:\/\/.+/.test(values.iconUrl)) {
+    errors.iconUrl = 'Enter a valid URL (http/https) or leave empty.';
   }
 
   return errors;
