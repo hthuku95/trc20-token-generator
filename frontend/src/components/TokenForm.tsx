@@ -64,15 +64,17 @@ export function TokenForm({ disabled, onReview }: TokenFormProps) {
     setProgress({ checked: 0, speed: 0, elapsed: 0, found: false, address: '', salt: '' });
   }
 
-  const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-
   async function handleVanitySearch() {
-    const pattern = values.vanityPattern.trim().toUpperCase();
+    const pattern = values.vanityPattern.trim();
     if (!pattern) return;
 
     for (const ch of pattern) {
-      if (!BASE58_ALPHABET.includes(ch)) {
-        toast.error(`Invalid character "${ch}" in pattern. Avoid 0, O, I, l.`);
+      if (!/^[a-zA-Z0-9]$/.test(ch)) {
+        toast.error(`Character "${ch}" not allowed. Use letters A-Z, a-z and digits 0-9.`);
+        return;
+      }
+      if (/^[0OIl]$/.test(ch)) {
+        toast.error(`Character "${ch}" can never appear in a TRON address (Base58 excludes 0, O, I, l).`);
         return;
       }
     }
@@ -233,7 +235,7 @@ export function TokenForm({ disabled, onReview }: TokenFormProps) {
                 <span className="text-lg font-semibold text-slate-400">T</span>
                 <input
                   value={values.vanityPattern}
-                  onChange={(event) => updateValue('vanityPattern', event.target.value.toUpperCase())}
+                  onChange={(event) => updateValue('vanityPattern', event.target.value)}
                   placeholder="R3D"
                   disabled={disabled || searching}
                   className="h-12 w-full rounded-md border border-line bg-ink/60 px-4 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-mint"
