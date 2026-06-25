@@ -103,6 +103,7 @@ export interface TronWebLike {
     toHex: (address: string) => string;
     fromHex: (address: string) => string;
   };
+  sha3: (data: string) => string;
 }
 
 declare global {

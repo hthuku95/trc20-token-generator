@@ -1,4 +1,3 @@
-import TronWeb from 'tronweb';
 import { tokenFactoryAbi } from '../contracts/tokenFactoryAbi';
 import { oracleAbi } from '../contracts/oracleAbi';
 import { oracleBytecode } from '../contracts/oracleBytecode';
@@ -125,7 +124,7 @@ export async function findVanitySalt(
     const salt = startSalt + i;
     const saltHex = salt.toString(16).padStart(64, '0');
     const preimage = '0x41' + factoryRaw + saltHex + initCodeHashClean;
-    const fullHash: string = (TronWeb as any).sha3(preimage);
+    const fullHash: string = tronWeb.sha3(preimage);
     const rawAddr = fullHash.slice(-40);
     const tronHex = '41' + rawAddr;
     const base58 = tronWeb.address.fromHex('0x' + tronHex);
