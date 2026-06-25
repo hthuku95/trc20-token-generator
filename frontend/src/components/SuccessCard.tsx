@@ -134,29 +134,35 @@ export function SuccessCard({ result, onCreateAnother }: SuccessCardProps) {
         <ResultRow label="Owner Address" value={result.ownerAddress} />
       </dl>
 
-      {poolAddress ? (
-        <div className="mt-6 rounded-md border border-line/70 bg-ink/40 p-4">
-          <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-200">
-            <Droplets className="h-4 w-4" />
-            SunSwap V3 Pool
-          </h3>
-          <p className="mb-2 text-xs text-slate-400">
-            A 1% fee pool paired with WTRX was created on SunSwap V3 (Nile). Price: ~3.03 WTRX/token.
+      <div className="mt-6 rounded-md border border-line/70 bg-ink/40 p-4">
+        <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-200">
+          <Droplets className="h-4 w-4" />
+          SunSwap V3 Pool <span className="text-xs font-normal text-slate-500">(Nile)</span>
+        </h3>
+        {poolAddress ? (
+          <>
+            <p className="mb-2 text-xs text-slate-400">
+              1% fee pool paired with WTRX at ~3.03 WTRX/token.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <ActionButton onClick={() => copy(poolAddress, 'Pool address')} label="Copy Pool Address" icon={<Copy />} />
+              <a
+                href={getTronScanAddressUrl(result.network, poolAddress)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex h-9 items-center gap-1.5 rounded-md bg-slate-800 px-3 text-xs font-medium text-slate-300 transition hover:bg-slate-700"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                View on Tronscan
+              </a>
+            </div>
+          </>
+        ) : (
+          <p className="text-xs text-slate-400">
+            No pool created yet. To create one, run <code className="rounded bg-ink/60 px-1 font-mono text-mint">source .env &amp;&amp; node scripts/sunswap-v3-setup.js</code> after deployment with <code className="rounded bg-ink/60 px-1 font-mono">TOKEN_ADDRESS</code> set to this token.
           </p>
-          <div className="flex flex-wrap gap-2">
-            <ActionButton onClick={() => copy(poolAddress, 'Pool address')} label="Copy Pool Address" icon={<Copy />} />
-            <a
-              href={getTronScanAddressUrl(result.network, poolAddress)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex h-9 items-center gap-1.5 rounded-md bg-slate-800 px-3 text-xs font-medium text-slate-300 transition hover:bg-slate-700"
-            >
-              <ExternalLink className="h-3.5 w-3.5" />
-              View on Tronscan
-            </a>
-          </div>
-        </div>
-      ) : null}
+        )}
+      </div>
 
       {!existingOracle && (
         <div className="mt-6 rounded-md border border-line/70 bg-ink/40 p-4">
