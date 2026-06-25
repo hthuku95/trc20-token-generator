@@ -1,11 +1,15 @@
 import { useState, useEffect } from 'react';
-import { Copy, ExternalLink, PlusCircle, Wallet, DollarSign, Link, RefreshCw } from 'lucide-react';
+import { Copy, ExternalLink, PlusCircle, Wallet, DollarSign, Link, RefreshCw, Droplets } from 'lucide-react';
 import type { ReactElement } from 'react';
 import toast from 'react-hot-toast';
-import { addTokenToWallet, deployOracleContract, getFactoryAddress, linkOracleToToken, readOraclePrice, setOraclePrice } from '../services/tronLink';
+import { addTokenToWallet, deployOracleContract, getFactoryAddress, getTronWeb, linkOracleToToken, readOraclePrice, setOraclePrice } from '../services/tronLink';
 import { getFactoryContract } from '../services/tronLink';
 import type { DeploymentResult } from '../types/tron';
 import { getTronScanAddressUrl, getTronScanTxUrl } from '../utils/network';
+
+const SUNSWAP_V3_FACTORY = 'TUTGcsGDRScK1gsDPMELV2QZxeESWb1Gac';
+const WTRX = 'TYsbWxNnyTgsZaTFaue9hqpxkU3Fkco94a';
+const FEE_TIER = 10000;
 
 interface SuccessCardProps {
   result: DeploymentResult | null;
@@ -20,6 +24,26 @@ export function SuccessCard({ result, onCreateAnother }: SuccessCardProps) {
   const [priceInput, setPriceInput] = useState('');
   const [settingPrice, setSettingPrice] = useState(false);
   const [existingOracle, setExistingOracle] = useState('');
+  const [poolAddress, setPoolAddress] = useState('');
+
+  useEffect(() => {
+    if (!result) return;
+    (async () => {
+      try {
+        const tw = getTronWeb();
+        if (!tw) return;
+        const factoryAbi: any[] = [
+          { inputs: [{ name: 'tokenA', type: 'address' }, { name: 'tokenB', type: 'address' }, { name: 'fee', type: 'uint24' }], name: 'getPool', outputs: [{ name: '', type: 'address' }], stateMutability: 'view', type: 'function' },
+        ];
+        const sunswapFactory: any = await tw.contract(factoryAbi, SUNSWAP_V3_FACTORY);
+        const pool = await sunswapFactory.getPool(result.contractAddress, WTRX, FEE_TIER).call();
+        const poolHex = (pool || '').replace('0x', '').toLowerCase();
+        if (poolHex && poolHex !== '410000000000000000000000000000000000000000') {
+          setPoolAddress(String(tw.address.fromHex('0x' + poolHex)));
+        }
+      } catch {}
+    })();
+  }, [result]);
 
   useEffect(() => {
     if (!result) return;
@@ -106,8 +130,33 @@ export function SuccessCard({ result, onCreateAnother }: SuccessCardProps) {
         <ResultRow label="Contract Address" value={result.contractAddress} />
         <ResultRow label="Transaction Hash" value={result.transactionHash} />
         {result.anchorPrice ? <ResultRow label="Anchor Price" value={result.anchorPrice} /> : null}
+        {poolAddress ? <ResultRow label="SunSwap V3 Pool" value={poolAddress} /> : null}
         <ResultRow label="Owner Address" value={result.ownerAddress} />
       </dl>
+
+      {poolAddress ? (
+        <div className="mt-6 rounded-md border border-line/70 bg-ink/40 p-4">
+          <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-200">
+            <Droplets className="h-4 w-4" />
+            SunSwap V3 Pool
+          </h3>
+          <p className="mb-2 text-xs text-slate-400">
+            A 1% fee pool paired with WTRX was created on SunSwap V3 (Nile). Price: ~3.03 WTRX/token.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <ActionButton onClick={() => copy(poolAddress, 'Pool address')} label="Copy Pool Address" icon={<Copy />} />
+            <a
+              href={getTronScanAddressUrl(result.network, poolAddress)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex h-9 items-center gap-1.5 rounded-md bg-slate-800 px-3 text-xs font-medium text-slate-300 transition hover:bg-slate-700"
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+              View on Tronscan
+            </a>
+          </div>
+        </div>
+      ) : null}
 
       {!existingOracle && (
         <div className="mt-6 rounded-md border border-line/70 bg-ink/40 p-4">
