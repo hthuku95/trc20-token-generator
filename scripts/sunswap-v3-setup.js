@@ -24,7 +24,10 @@ const WTRX                = 'TYsbWxNnyTgsZaTFaue9hqpxkU3Fkco94a';
 const FEE_TIER            = 10000;
 const TICK_SPACING        = 200;
 
-const TOKEN = process.env.TOKEN_ADDRESS || 'TGU75S5GAkZZs3uWTcZGGMPXHBKG1FGdWJ';
+/// 'TGU75S5GAkZZs3uWTcZGGMPXHBKG1FGdWJ', 
+
+
+const TOKEN = process.env.TOKEN_ADDRESS || 'TZCDV3bjjhgyTqzhPzHao2px3qUNgTdfUf';
 const PK    = process.env.PRIVATE_KEY_NILE;
 
 if (!PK) { console.error('Missing PRIVATE_KEY_NILE'); process.exit(1); }
@@ -312,9 +315,11 @@ async function main() {
     console.error(`[${now()}] Position 3 failed: ${(e?.message || e?.error || JSON.stringify(e)).substring(0, 300)}`);
   }
 
-  console.log(`\n[${now()}] ✅ Done! Pool: ${poolAddr}`);
-  console.log(`[${now()}] Explorer: https://nile.tronscan.org/#/contract/${poolAddr}`);
-  console.log(`[${now()}] Add to TronLink: open the pool on Tronscan to verify`);
+  const poolB58 = tw.address.fromHex(poolAddr.replace('0x', ''));
+  console.log(`\n[${now()}] ✅ Done! Pool (base58): ${poolB58}`);
+  console.log(`[${now()}] Explorer: https://nile.tronscan.org/#/contract/${poolB58}`);
+  console.log(`[${now()}] Hex:      ${poolAddr}`);
+  console.log(`[${now()}] Set TOKEN_POOL_ADDRESS=${poolB58} in .env to track this pool`);
 }
 
 main().catch(e => { console.error('Fatal:', e?.message || e?.error || JSON.stringify(e) || e); process.exit(1); });
