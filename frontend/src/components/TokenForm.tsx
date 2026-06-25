@@ -247,12 +247,43 @@ export function TokenForm({ disabled, onReview }: TokenFormProps) {
               </p>
             </label>
 
+            <label className="space-y-2">
+              <span className="text-sm font-medium text-slate-300">
+                Salt (optional) <span className="text-slate-500">— paste a previously found salt to skip search</span>
+              </span>
+              <input
+                value={values.vanitySalt}
+                onChange={(event) => updateValue('vanitySalt', event.target.value)}
+                placeholder="0x1b923986a863eaac63313390b9d42af..."
+                disabled={disabled || searching}
+                className="h-12 w-full rounded-md border border-line bg-ink/60 px-4 font-mono text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-mint"
+              />
+              {values.vanitySalt && !/^0x[0-9a-fA-F]{64}$/.test(values.vanitySalt) && (
+                <p className="text-xs text-coral">Must be a 64-char hex string starting with 0x</p>
+              )}
+            </label>
+
+            {values.vanitySalt && (
+              <label className="space-y-2">
+                <span className="text-sm font-medium text-slate-300">
+                  Predicted Address <span className="text-slate-500">— enter the expected address</span>
+                </span>
+                <input
+                  value={values.vanityAddress}
+                  onChange={(event) => updateValue('vanityAddress', event.target.value)}
+                  placeholder="TR7NznPgGHYLJtQKKCq321SYJxJXLwuj6t"
+                  disabled={disabled}
+                  className="h-12 w-full rounded-md border border-line bg-ink/60 px-4 font-mono text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-mint"
+                />
+              </label>
+            )}
+
             <div className="flex gap-2">
               {!searching ? (
                 <button
                   type="button"
                   onClick={handleVanitySearch}
-                  disabled={!values.vanityPattern || disabled}
+                  disabled={!values.vanityPattern || !!values.vanitySalt || disabled}
                   className="inline-flex h-10 items-center gap-2 rounded-md border border-line px-3 text-sm font-semibold text-slate-100 transition hover:border-mint disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Search className="h-4 w-4" />
