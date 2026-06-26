@@ -48,16 +48,17 @@ async function rpcCall(to: string, data: string): Promise<string> {
   return String(json.result);
 }
 
-function decodeAddress(hex: string): string {
-  const raw = hex.replace('0x', '');
+// Extract 20-byte address from a 32-byte ABI word and return TRON hex (0x41...)
+function extractAddress(abiWord: string): string {
+  const raw = abiWord.replace('0x', '');
+  return '0x41' + raw.slice(-40);
+}
+
+// Convert 0x41-prefixed TRON hex back to base58 for display
+function hexToBase58(hex: string): string {
   const tw = getTronWeb();
-  if (tw?.address?.fromHex) {
-    try {
-      return String(tw.address.fromHex('0x' + raw.slice(0, 42)));
-    } catch {}
-  }
-  // Fallback: just hex
-  return '0x' + raw.slice(0, 40);
+  if (tw?.address?.fromHex) return String(tw.address.fromHex(hex.replace('0x', '')));
+  return hex; // fallback
 }
 
 function decodeInt24(hex: string): number {
@@ -110,22 +111,24 @@ export function PoolPriceChecker() {
         + padHex(FEE_TIER.toString(16), 32).replace('0x', '');
 
       const poolRaw = await rpcCall(factoryHex, getPoolData);
-      const poolHex = poolRaw.replace('0x', '').toLowerCase();
-      if (!poolHex || poolHex === '0000000000000000000000000000000000000000' || poolHex.startsWith('4100000000000000000000000000000000000000')) {
+      const poolABIWord = poolRaw.replace('0x', '').toLowerCase();
+      const poolEvmAddr = poolABIWord.slice(-40);  // last 40 hex chars = 20 bytes
+      if (!poolEvmAddr || /^0+$/.test(poolEvmAddr)) {
         setNotFound(true);
         setLoading(false);
         return;
       }
 
-      const poolAddr = decodeAddress(poolHex);
+      const poolTronHex = '0x41' + poolEvmAddr;
+      const poolAddr = hexToBase58(poolTronHex);
 
       // slot0() selector = 0x3850c7bd
-      const slot0Raw = await rpcCall('0x' + poolHex, '0x3850c7bd');
+      const slot0Raw = await rpcCall(poolTronHex, '0x3850c7bd');
       const slot0Hex = slot0Raw.replace('0x', '');
       const tick = decodeInt24(slot0Hex.slice(64, 128));
 
       // liquidity() selector = 0x1a686502
-      const liqRaw = await rpcCall('0x' + poolHex, '0x1a686502');
+      const liqRaw = await rpcCall(poolTronHex, '0x1a686502');
       const liquidity = BigInt(liqRaw).toString();
 
       const price = Math.pow(1.0001, tick);
