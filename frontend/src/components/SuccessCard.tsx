@@ -25,6 +25,8 @@ export function SuccessCard({ result, onCreateAnother }: SuccessCardProps) {
   const [settingPrice, setSettingPrice] = useState(false);
   const [existingOracle, setExistingOracle] = useState('');
   const [poolAddress, setPoolAddress] = useState('');
+  const [poolPrice, setPoolPrice] = useState<string | null>(null);
+  const [poolPriceLoading, setPoolPriceLoading] = useState(false);
 
   useEffect(() => {
     if (!result) return;
@@ -44,6 +46,34 @@ export function SuccessCard({ result, onCreateAnother }: SuccessCardProps) {
       } catch {}
     })();
   }, [result]);
+
+  useEffect(() => {
+    if (!poolAddress) return;
+    (async () => {
+      setPoolPriceLoading(true);
+      try {
+        const tw = getTronWeb();
+        if (!tw) return;
+        const poolAbi: any[] = [
+          { inputs: [], name: 'slot0', outputs: [
+            { name: 'sqrtPriceX96', type: 'uint160' },
+            { name: 'tick', type: 'int24' },
+            { name: 'observationIndex', type: 'uint16' },
+            { name: 'observationCardinality', type: 'uint16' },
+            { name: 'observationCardinalityNext', type: 'uint16' },
+            { name: 'feeProtocol', type: 'uint8' },
+            { name: 'unlocked', type: 'bool' },
+          ], stateMutability: 'view', type: 'function' },
+        ];
+        const pool: any = await tw.contract(poolAbi, poolAddress);
+        const slot0 = await pool.slot0().call();
+        const tick = Number(slot0[1]);
+        const price = Math.pow(1.0001, tick);
+        setPoolPrice(price.toFixed(4));
+      } catch {}
+      setPoolPriceLoading(false);
+    })();
+  }, [poolAddress]);
 
   useEffect(() => {
     if (!result) return;
@@ -142,8 +172,19 @@ export function SuccessCard({ result, onCreateAnother }: SuccessCardProps) {
         {poolAddress ? (
           <>
             <p className="mb-2 text-xs text-slate-400">
-              1% fee pool paired with WTRX at ~3.03 WTRX/token.
+              1% fee pool paired with WTRX.
             </p>
+            {poolPriceLoading ? (
+              <p className="mb-2 text-xs text-slate-500">Reading price...</p>
+            ) : poolPrice !== null ? (
+              <div className="mb-3 flex items-center gap-2 text-sm">
+                <span className="text-slate-400">Current Price:</span>
+                <span className="font-semibold text-white">{poolPrice} WTRX per token</span>
+                {result.anchorPrice ? (
+                  <span className="text-xs text-slate-500">(~${parseFloat(result.anchorPrice.replace('$', '')).toFixed(2)} USD)</span>
+                ) : null}
+              </div>
+            ) : null}
             <div className="flex flex-wrap gap-2">
               <ActionButton onClick={() => copy(poolAddress, 'Pool address')} label="Copy Pool Address" icon={<Copy />} />
               <a
