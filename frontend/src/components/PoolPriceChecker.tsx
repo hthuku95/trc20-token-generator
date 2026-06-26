@@ -10,11 +10,22 @@ const WTRX = 'TYsbWxNnyTgsZaTFaue9hqpxkU3Fkco94a';
 const FEE_TIER = 10000;
 const NILE_RPC = 'https://nile.trongrid.io/jsonrpc';
 
-function toHexAddr(base58: string): string {
-  const tw = getTronWeb();
-  if (!tw) return '';
-  const hex = tw.address.toHex(base58);
-  return hex.startsWith('0x') ? hex : '0x' + hex;
+const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+
+function base58ToHex(base58: string): string {
+  let num = 0n;
+  for (const ch of base58) {
+    const idx = BASE58_ALPHABET.indexOf(ch);
+    if (idx === -1) throw new Error(`Invalid base58 character: ${ch}`);
+    num = num * 58n + BigInt(idx);
+  }
+  let hex = num.toString(16);
+  if (hex.length % 2) hex = '0' + hex;
+  // Keep leading zeros (TRON addresses have a leading 1 that encodes to 00 bytes)
+  const leadingZeros = base58.match(/^1+/)?.[0]?.length ?? 0;
+  hex = '00'.repeat(leadingZeros) + hex;
+  // TRON addresses use 0x41 prefix
+  return '0x41' + hex.slice(2, 42);
 }
 
 function padHex(hex: string, bytes: number): string {
@@ -33,26 +44,27 @@ async function rpcCall(to: string, data: string): Promise<string> {
     }),
   });
   const json = await res.json();
-  if (json.error) throw new Error(json.error.message);
+  if (json.error) throw new Error(json.error.message || String(json.error));
   return String(json.result);
 }
 
 function decodeAddress(hex: string): string {
-  const raw = hex.replace('0x', '').toLowerCase();
-  const addrHex = raw.length > 40 ? raw.slice(-40) : raw;
+  const raw = hex.replace('0x', '');
   const tw = getTronWeb();
-  if (!tw) return '0x' + addrHex;
-  return String(tw.address.fromHex('0x' + addrHex));
-}
-
-function decodeUint256(hex: string): bigint {
-  return BigInt(hex);
+  if (tw?.address?.fromHex) {
+    try {
+      return String(tw.address.fromHex('0x' + raw.slice(0, 42)));
+    } catch {}
+  }
+  // Fallback: just hex
+  return '0x' + raw.slice(0, 40);
 }
 
 function decodeInt24(hex: string): number {
-  const val = BigInt(hex);
-  if (val & (1n << 23n)) return Number(val | (~BigInt('0xFFFFFF')));
-  return Number(val);
+  const full = BigInt('0x' + hex);
+  const val24 = Number(full & 0xFFFFFFn);
+  if (val24 & 0x800000) return val24 - 0x1000000;
+  return val24;
 }
 
 interface PoolInfo {
@@ -84,12 +96,9 @@ export function PoolPriceChecker() {
     }
 
     try {
-      const tw = getTronWeb();
-      if (!tw) { toast.error('Connect TronLink first'); return; }
-
-      const factoryHex = toHexAddr(SUNSWAP_FACTORY);
-      const tokenHex = toHexAddr(addr);
-      const wtrxHex = toHexAddr(WTRX);
+      const factoryHex = base58ToHex(SUNSWAP_FACTORY);
+      const tokenHex = base58ToHex(addr);
+      const wtrxHex = base58ToHex(WTRX);
 
       const token0 = tokenHex.toLowerCase() < wtrxHex.toLowerCase() ? tokenHex : wtrxHex;
       const token1 = tokenHex.toLowerCase() < wtrxHex.toLowerCase() ? wtrxHex : tokenHex;
@@ -102,7 +111,7 @@ export function PoolPriceChecker() {
 
       const poolRaw = await rpcCall(factoryHex, getPoolData);
       const poolHex = poolRaw.replace('0x', '').toLowerCase();
-      if (!poolHex || poolHex === '0000000000000000000000000000000000000000' || poolHex === '410000000000000000000000000000000000000000') {
+      if (!poolHex || poolHex === '0000000000000000000000000000000000000000' || poolHex.startsWith('4100000000000000000000000000000000000000')) {
         setNotFound(true);
         setLoading(false);
         return;
@@ -111,29 +120,25 @@ export function PoolPriceChecker() {
       const poolAddr = decodeAddress(poolHex);
 
       // slot0() selector = 0x3850c7bd
-      const slot0Data = '0x3850c7bd';
-      const slot0Raw = await rpcCall(poolHex, slot0Data);
+      const slot0Raw = await rpcCall('0x' + poolHex, '0x3850c7bd');
       const slot0Hex = slot0Raw.replace('0x', '');
-      const sqrtPriceX96 = slot0Hex.slice(0, 64);
-      const tickHex = slot0Hex.slice(64, 128);
-      const tick = decodeInt24(tickHex);
+      const tick = decodeInt24(slot0Hex.slice(64, 128));
 
       // liquidity() selector = 0x1a686502
-      const liqData = '0x1a686502';
-      const liqRaw = await rpcCall(poolHex, liqData);
-      const liquidity = decodeUint256(liqRaw).toString();
+      const liqRaw = await rpcCall('0x' + poolHex, '0x1a686502');
+      const liquidity = BigInt(liqRaw).toString();
 
       const price = Math.pow(1.0001, tick);
 
       setPoolInfo({
         poolAddress: poolAddr,
-        sqrtPriceX96: '0x' + sqrtPriceX96,
+        sqrtPriceX96: '0x' + slot0Hex.slice(0, 64),
         tick,
         price,
         liquidity,
       });
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
+      const msg = e instanceof Error ? e.message : 'Failed to read pool';
       toast.error(msg.includes('smart contract') ? 'Contract not found on this network. Make sure TronLink is on Nile Testnet.' : msg);
     }
     setLoading(false);
