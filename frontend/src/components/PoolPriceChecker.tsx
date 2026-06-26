@@ -7,7 +7,12 @@ import { useDappStore } from '../store/useDappStore';
 
 const SUNSWAP_FACTORY = 'TUTGcsGDRScK1gsDPMELV2QZxeESWb1Gac';
 const WTRX = 'TYsbWxNnyTgsZaTFaue9hqpxkU3Fkco94a';
-const FEE_TIER = 10000;
+const FEE_TIERS = [
+  { tier: 10000, label: '1%' },
+  { tier: 3000, label: '0.30%' },
+  { tier: 500, label: '0.05%' },
+  { tier: 100, label: '0.01%' },
+];
 const NILE_RPC = 'https://nile.trongrid.io/jsonrpc';
 
 const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
@@ -69,8 +74,9 @@ function decodeInt24(hex: string): number {
 }
 
 interface PoolInfo {
+  feeLabel: string;
+  feeTier: number;
   poolAddress: string;
-  sqrtPriceX96: string;
   tick: number;
   price: number;
   liquidity: string;
@@ -80,15 +86,15 @@ export function PoolPriceChecker() {
   const network = useDappStore((s) => s.network);
   const [tokenAddress, setTokenAddress] = useState('');
   const [loading, setLoading] = useState(false);
-  const [poolInfo, setPoolInfo] = useState<PoolInfo | null>(null);
-  const [notFound, setNotFound] = useState(false);
+  const [poolInfos, setPoolInfos] = useState<PoolInfo[]>([]);
+  const [searched, setSearched] = useState(false);
 
   async function handleSearch() {
     const addr = tokenAddress.trim();
     if (!addr) return;
     setLoading(true);
-    setPoolInfo(null);
-    setNotFound(false);
+    setPoolInfos([]);
+    setSearched(false);
 
     if (network !== 'nile') {
       toast.error('Switch TronLink to Nile Testnet — SunSwap V3 on Mainnet is not supported yet');
@@ -104,42 +110,40 @@ export function PoolPriceChecker() {
       const token0 = tokenHex.toLowerCase() < wtrxHex.toLowerCase() ? tokenHex : wtrxHex;
       const token1 = tokenHex.toLowerCase() < wtrxHex.toLowerCase() ? wtrxHex : tokenHex;
 
-      // getPool(address,address,uint24) selector = 0x1698ee82
-      const getPoolData = '0x1698ee82'
-        + padHex(token0, 32).replace('0x', '')
-        + padHex(token1, 32).replace('0x', '')
-        + padHex(FEE_TIER.toString(16), 32).replace('0x', '');
+      const foundPools: PoolInfo[] = [];
 
-      const poolRaw = await rpcCall(factoryHex, getPoolData);
-      const poolABIWord = poolRaw.replace('0x', '').toLowerCase();
-      const poolEvmAddr = poolABIWord.slice(-40);  // last 40 hex chars = 20 bytes
-      if (!poolEvmAddr || /^0+$/.test(poolEvmAddr)) {
-        setNotFound(true);
-        setLoading(false);
-        return;
+      for (const ft of FEE_TIERS) {
+        const getPoolData = '0x1698ee82'
+          + padHex(token0, 32).replace('0x', '')
+          + padHex(token1, 32).replace('0x', '')
+          + padHex(ft.tier.toString(16), 32).replace('0x', '');
+
+        const poolRaw = await rpcCall(factoryHex, getPoolData);
+        const poolEvmAddr = poolRaw.replace('0x', '').toLowerCase().slice(-40);
+        if (!poolEvmAddr || /^0+$/.test(poolEvmAddr)) continue;
+
+        const poolTronHex = '0x41' + poolEvmAddr;
+        const poolAddr = hexToBase58(poolTronHex);
+
+        const slot0Raw = await rpcCall(poolTronHex, '0x3850c7bd');
+        const slot0Hex = slot0Raw.replace('0x', '');
+        const tick = decodeInt24(slot0Hex.slice(64, 128));
+
+        const liqRaw = await rpcCall(poolTronHex, '0x1a686502');
+        const liquidity = BigInt(liqRaw).toString();
+
+        foundPools.push({
+          feeLabel: ft.label,
+          feeTier: ft.tier,
+          poolAddress: poolAddr,
+          tick,
+          price: Math.pow(1.0001, tick),
+          liquidity,
+        });
       }
 
-      const poolTronHex = '0x41' + poolEvmAddr;
-      const poolAddr = hexToBase58(poolTronHex);
-
-      // slot0() selector = 0x3850c7bd
-      const slot0Raw = await rpcCall(poolTronHex, '0x3850c7bd');
-      const slot0Hex = slot0Raw.replace('0x', '');
-      const tick = decodeInt24(slot0Hex.slice(64, 128));
-
-      // liquidity() selector = 0x1a686502
-      const liqRaw = await rpcCall(poolTronHex, '0x1a686502');
-      const liquidity = BigInt(liqRaw).toString();
-
-      const price = Math.pow(1.0001, tick);
-
-      setPoolInfo({
-        poolAddress: poolAddr,
-        sqrtPriceX96: '0x' + slot0Hex.slice(0, 64),
-        tick,
-        price,
-        liquidity,
-      });
+      setPoolInfos(foundPools);
+      setSearched(true);
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Failed to read pool';
       toast.error(msg.includes('smart contract') ? 'Contract not found on this network. Make sure TronLink is on Nile Testnet.' : msg);
@@ -180,26 +184,27 @@ export function PoolPriceChecker() {
           Switch TronLink to Nile Testnet to check pool prices. SunSwap V3 on Mainnet is not supported yet.
         </p>
       )}
-      {notFound && (
+      {searched && poolInfos.length === 0 && (
         <p className="mt-3 text-sm text-amber">
-          No SunSwap V3 pool found for this token on {network === 'mainnet' ? 'Mainnet' : 'Nile'}.
+          No SunSwap V3 pool found for this token on Nile.
         </p>
       )}
 
-      {poolInfo && (
-        <div className="mt-4 space-y-3 rounded-md border border-line/70 bg-ink/40 p-4">
+      {poolInfos.map((p) => (
+        <div key={p.feeTier} className="mt-4 space-y-3 rounded-md border border-line/70 bg-ink/40 p-4">
           <div className="flex items-center justify-between">
-            <span className="text-xs text-slate-500">Pool Address</span>
-            <div className="flex gap-1">
+            <span className="text-xs text-slate-500">Pool ({p.feeLabel})</span>
+            <div className="flex gap-2">
+              <span className="text-xs text-slate-600">{p.poolAddress.slice(0, 8)}...{p.poolAddress.slice(-4)}</span>
               <button
                 type="button"
-                onClick={() => { navigator.clipboard.writeText(poolInfo.poolAddress); toast.success('Pool address copied'); }}
+                onClick={() => { navigator.clipboard.writeText(p.poolAddress); toast.success('Pool address copied'); }}
                 className="text-slate-400 hover:text-white"
               >
                 <Copy className="h-3 w-3" />
               </button>
               <a
-                href={getTronScanAddressUrl(network, poolInfo.poolAddress)}
+                href={getTronScanAddressUrl(network, p.poolAddress)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-slate-400 hover:text-white"
@@ -208,25 +213,29 @@ export function PoolPriceChecker() {
               </a>
             </div>
           </div>
-          <p className="break-all text-sm text-slate-200">{poolInfo.poolAddress}</p>
+          <p className="break-all text-sm text-slate-200">{p.poolAddress}</p>
 
           <div className="flex items-center gap-2 text-sm">
             <span className="text-slate-400">Current Price:</span>
-            <span className="font-semibold text-white">{poolInfo.price.toFixed(4)} WTRX per token</span>
+            <span className="font-semibold text-white">{p.price.toFixed(4)} WTRX per token</span>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 text-xs">
+          <div className="grid grid-cols-3 gap-3 text-xs">
+            <div className="rounded-md bg-ink/40 p-2">
+              <span className="text-slate-500">Fee</span>
+              <p className="font-mono text-slate-200">{p.feeLabel}</p>
+            </div>
             <div className="rounded-md bg-ink/40 p-2">
               <span className="text-slate-500">Tick</span>
-              <p className="font-mono text-slate-200">{poolInfo.tick}</p>
+              <p className="font-mono text-slate-200">{p.tick}</p>
             </div>
             <div className="rounded-md bg-ink/40 p-2">
               <span className="text-slate-500">Liquidity</span>
-              <p className="font-mono text-slate-200">{poolInfo.liquidity}</p>
+              <p className="font-mono text-slate-200">{p.liquidity}</p>
             </div>
           </div>
         </div>
-      )}
+      ))}
     </section>
   );
 }
