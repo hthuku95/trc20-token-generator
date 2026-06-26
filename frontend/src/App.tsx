@@ -3,6 +3,7 @@ import { useMutation } from '@tanstack/react-query';
 import { ShieldCheck, Sparkles } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { DeploymentProgress } from './components/DeploymentProgress';
+import { PoolPriceChecker } from './components/PoolPriceChecker';
 import { ReviewPanel } from './components/ReviewPanel';
 import { SuccessCard } from './components/SuccessCard';
 import { TokenForm } from './components/TokenForm';
@@ -129,6 +130,8 @@ function App() {
             onDeploy={handleDeploy}
           />
         </section>
+
+        <PoolPriceChecker />
       </div>
     </main>
   );
