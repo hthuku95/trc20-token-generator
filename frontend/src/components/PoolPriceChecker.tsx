@@ -30,6 +30,13 @@ export function PoolPriceChecker() {
     setLoading(true);
     setPoolInfo(null);
     setNotFound(false);
+
+    if (network !== 'nile') {
+      toast.error('Switch TronLink to Nile Testnet — SunSwap V3 on Mainnet is not supported yet');
+      setLoading(false);
+      return;
+    }
+
     try {
       const tw = getTronWeb();
       if (!tw) { toast.error('Connect TronLink first'); return; }
@@ -79,7 +86,8 @@ export function PoolPriceChecker() {
         liquidity: liquidity.toString(),
       });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed to read pool');
+      const msg = e instanceof Error ? e.message : 'Failed to read pool';
+      toast.error(msg.includes('smart contract') ? 'Contract not found on this network. Make sure TronLink is on Nile Testnet.' : msg);
     }
     setLoading(false);
   }
@@ -112,9 +120,14 @@ export function PoolPriceChecker() {
         </button>
       </div>
 
+      {network !== 'nile' && (
+        <p className="mt-3 text-sm text-amber">
+          Switch TronLink to Nile Testnet to check pool prices. SunSwap V3 on Mainnet is not supported yet.
+        </p>
+      )}
       {notFound && (
         <p className="mt-3 text-sm text-amber">
-          No SunSwap V3 pool found for this token on Nile.
+          No SunSwap V3 pool found for this token on {network === 'mainnet' ? 'Mainnet' : 'Nile'}.
         </p>
       )}
 
