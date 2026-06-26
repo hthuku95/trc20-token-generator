@@ -88,6 +88,7 @@ export function PoolPriceChecker() {
   const [loading, setLoading] = useState(false);
   const [poolInfos, setPoolInfos] = useState<PoolInfo[]>([]);
   const [searched, setSearched] = useState(false);
+  const [totalSupply, setTotalSupply] = useState<string | null>(null);
 
   async function handleSearch() {
     const addr = tokenAddress.trim();
@@ -106,6 +107,11 @@ export function PoolPriceChecker() {
       const factoryHex = base58ToHex(SUNSWAP_FACTORY);
       const tokenHex = base58ToHex(addr);
       const wtrxHex = base58ToHex(WTRX);
+
+      // Fetch total supply (selector = 0x18160ddd)
+      const supplyRaw = await rpcCall(tokenHex, '0x18160ddd');
+      const supply = BigInt(supplyRaw);
+      setTotalSupply(supply.toString());
 
       const token0 = tokenHex.toLowerCase() < wtrxHex.toLowerCase() ? tokenHex : wtrxHex;
       const token1 = tokenHex.toLowerCase() < wtrxHex.toLowerCase() ? wtrxHex : tokenHex;
@@ -236,6 +242,29 @@ export function PoolPriceChecker() {
           </div>
         </div>
       ))}
+
+      {poolInfos.length > 0 && totalSupply && (
+        <div className="mt-4 rounded-md border border-line/70 bg-ink/40 p-4">
+          <h4 className="mb-3 text-xs font-semibold uppercase text-slate-500">Token Info</h4>
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-slate-400">Total Supply</span>
+            <span className="font-semibold text-white">{(Number(totalSupply) / 1e6).toLocaleString()} tokens</span>
+          </div>
+          <div className="flex items-center justify-between text-sm mt-2">
+            <span className="text-slate-400">Pool Price</span>
+            <span className="font-semibold text-white">{poolInfos[0].price.toFixed(4)} WTRX per token</span>
+          </div>
+          <div className="flex items-center justify-between text-sm mt-2 border-t border-line/40 pt-2">
+            <span className="text-slate-400">Market Cap</span>
+            <span className="font-semibold text-white">
+              ${(Number(totalSupply) / 1e6 * poolInfos[0].price * 0.33).toLocaleString(undefined, {maximumFractionDigits: 0})} USD
+            </span>
+          </div>
+          <p className="mt-1 text-xs text-slate-500">
+            {poolInfos[0].price.toFixed(4)} WTRX ≈ ${(poolInfos[0].price * 0.33).toFixed(2)} at $0.33/WTRX
+          </p>
+        </div>
+      )}
     </section>
   );
 }
