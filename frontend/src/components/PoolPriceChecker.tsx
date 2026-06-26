@@ -8,6 +8,52 @@ import { useDappStore } from '../store/useDappStore';
 const SUNSWAP_FACTORY = 'TUTGcsGDRScK1gsDPMELV2QZxeESWb1Gac';
 const WTRX = 'TYsbWxNnyTgsZaTFaue9hqpxkU3Fkco94a';
 const FEE_TIER = 10000;
+const NILE_RPC = 'https://nile.trongrid.io/jsonrpc';
+
+function toHexAddr(base58: string): string {
+  const tw = getTronWeb();
+  if (!tw) return '';
+  const hex = tw.address.toHex(base58);
+  return hex.startsWith('0x') ? hex : '0x' + hex;
+}
+
+function padHex(hex: string, bytes: number): string {
+  return '0x' + hex.replace('0x', '').padStart(bytes * 2, '0');
+}
+
+async function rpcCall(to: string, data: string): Promise<string> {
+  const res = await fetch(NILE_RPC, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'eth_call',
+      params: [{ to, data }, 'latest'],
+    }),
+  });
+  const json = await res.json();
+  if (json.error) throw new Error(json.error.message);
+  return String(json.result);
+}
+
+function decodeAddress(hex: string): string {
+  const raw = hex.replace('0x', '').toLowerCase();
+  const addrHex = raw.length > 40 ? raw.slice(-40) : raw;
+  const tw = getTronWeb();
+  if (!tw) return '0x' + addrHex;
+  return String(tw.address.fromHex('0x' + addrHex));
+}
+
+function decodeUint256(hex: string): bigint {
+  return BigInt(hex);
+}
+
+function decodeInt24(hex: string): number {
+  const val = BigInt(hex);
+  if (val & (1n << 23n)) return Number(val | (~BigInt('0xFFFFFF')));
+  return Number(val);
+}
 
 interface PoolInfo {
   poolAddress: string;
@@ -41,52 +87,53 @@ export function PoolPriceChecker() {
       const tw = getTronWeb();
       if (!tw) { toast.error('Connect TronLink first'); return; }
 
-      const factoryAbi: any[] = [
-        { inputs: [{ name: 'tokenA', type: 'address' }, { name: 'tokenB', type: 'address' }, { name: 'fee', type: 'uint24' }], name: 'getPool', outputs: [{ name: '', type: 'address' }], stateMutability: 'view', type: 'function' },
-      ];
-      const factory: any = await tw.contract(factoryAbi, SUNSWAP_FACTORY);
-      const tokenHex = tw.address.toHex(addr);
-      const wtrxHex = tw.address.toHex(WTRX);
-      const token0Hex = tokenHex.toLowerCase() < wtrxHex.toLowerCase() ? tokenHex : wtrxHex;
-      const token1Hex = tokenHex.toLowerCase() < wtrxHex.toLowerCase() ? wtrxHex : tokenHex;
+      const factoryHex = toHexAddr(SUNSWAP_FACTORY);
+      const tokenHex = toHexAddr(addr);
+      const wtrxHex = toHexAddr(WTRX);
 
-      const pool = await factory.getPool(token0Hex, token1Hex, FEE_TIER).call();
-      const poolHex = (pool || '').replace('0x', '').toLowerCase();
-      if (!poolHex || poolHex === '410000000000000000000000000000000000000000') {
+      const token0 = tokenHex.toLowerCase() < wtrxHex.toLowerCase() ? tokenHex : wtrxHex;
+      const token1 = tokenHex.toLowerCase() < wtrxHex.toLowerCase() ? wtrxHex : tokenHex;
+
+      // getPool(address,address,uint24) selector = 0x1698ee82
+      const getPoolData = '0x1698ee82'
+        + padHex(token0, 32).replace('0x', '')
+        + padHex(token1, 32).replace('0x', '')
+        + padHex(FEE_TIER.toString(16), 32).replace('0x', '');
+
+      const poolRaw = await rpcCall(factoryHex, getPoolData);
+      const poolHex = poolRaw.replace('0x', '').toLowerCase();
+      if (!poolHex || poolHex === '0000000000000000000000000000000000000000' || poolHex === '410000000000000000000000000000000000000000') {
         setNotFound(true);
         setLoading(false);
         return;
       }
 
-      const poolAddr = String(tw.address.fromHex('0x' + poolHex));
+      const poolAddr = decodeAddress(poolHex);
 
-      const poolAbi: any[] = [
-        { inputs: [], name: 'slot0', outputs: [
-          { name: 'sqrtPriceX96', type: 'uint160' },
-          { name: 'tick', type: 'int24' },
-          { name: 'observationIndex', type: 'uint16' },
-          { name: 'observationCardinality', type: 'uint16' },
-          { name: 'observationCardinalityNext', type: 'uint16' },
-          { name: 'feeProtocol', type: 'uint8' },
-          { name: 'unlocked', type: 'bool' },
-        ], stateMutability: 'view', type: 'function' },
-        { inputs: [], name: 'liquidity', outputs: [{ name: '', type: 'uint128' }], stateMutability: 'view', type: 'function' },
-      ];
-      const poolContract: any = await tw.contract(poolAbi, poolAddr);
-      const slot0 = await poolContract.slot0().call();
-      const liquidity = await poolContract.liquidity().call();
-      const tick = Number(slot0[1]);
+      // slot0() selector = 0x3850c7bd
+      const slot0Data = '0x3850c7bd';
+      const slot0Raw = await rpcCall(poolHex, slot0Data);
+      const slot0Hex = slot0Raw.replace('0x', '');
+      const sqrtPriceX96 = slot0Hex.slice(0, 64);
+      const tickHex = slot0Hex.slice(64, 128);
+      const tick = decodeInt24(tickHex);
+
+      // liquidity() selector = 0x1a686502
+      const liqData = '0x1a686502';
+      const liqRaw = await rpcCall(poolHex, liqData);
+      const liquidity = decodeUint256(liqRaw).toString();
+
       const price = Math.pow(1.0001, tick);
 
       setPoolInfo({
         poolAddress: poolAddr,
-        sqrtPriceX96: slot0[0].toString(),
+        sqrtPriceX96: '0x' + sqrtPriceX96,
         tick,
         price,
-        liquidity: liquidity.toString(),
+        liquidity,
       });
     } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Failed to read pool';
+      const msg = e instanceof Error ? e.message : String(e);
       toast.error(msg.includes('smart contract') ? 'Contract not found on this network. Make sure TronLink is on Nile Testnet.' : msg);
     }
     setLoading(false);
